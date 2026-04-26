@@ -1,5 +1,5 @@
 import { IOption } from '@/@common/types/IOption'
-import { cn } from '@/utils/cn'
+import { cn } from '@/@common/utils/cn'
 import React from 'react'
 import ReactSelect, { type Props as SelectProps } from 'react-select'
 import CreatableSelect from 'react-select/creatable'
