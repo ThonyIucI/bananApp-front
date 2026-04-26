@@ -20,11 +20,11 @@ npm install
 Crea un archivo `.env.local` en `saas/front/`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://192.168.18.5:3000
+NEXT_PUBLIC_API_URL=http://192.168.18.5:3001
 ```
 
 > Reemplaza `192.168.18.5` con la IP de tu máquina en la red local.
-> Para desarrollo solo en tu PC podés usar `http://localhost:3000`.
+> Para desarrollo solo en tu PC podés usar `http://localhost:3001`.
 
 ## Levantar el servidor de desarrollo
 
