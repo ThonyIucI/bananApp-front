@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Ingresar — bananApp',
-  description: 'Ingresa a tu cuenta de bananApp',
+  title: 'Ingresar — CultivApp',
+  description: 'Ingresa a tu cuenta de CultivApp',
 };
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {

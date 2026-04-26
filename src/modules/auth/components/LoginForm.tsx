@@ -6,7 +6,8 @@ import { loginSchema, type LoginFormValues } from '../schemas/login.schema';
 import { useLogin } from '../hooks/useLogin';
 
 export function LoginForm() {
-  const { login, isPending, serverError } = useLogin();
+  const { login, isPending } = useLogin();
+  // errors shown via toast — no serverError state needed
 
   const {
     register,
@@ -17,44 +18,18 @@ export function LoginForm() {
   });
 
   return (
+    // suppressHydrationWarning prevents false hydration mismatches caused by
+    // browser extensions (e.g. LastPass) injecting elements into the form.
     <form
       onSubmit={handleSubmit(login)}
       className="flex flex-col gap-5"
       noValidate
+      suppressHydrationWarning
       style={{ touchAction: 'manipulation' }}
     >
-      {/* Server error */}
-      {serverError && (
-        <div
-          role="alert"
-          aria-live="polite"
-          className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3.5 text-sm text-red-700"
-        >
-          <svg
-            className="mt-0.5 h-4 w-4 shrink-0 text-red-500"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <span>{serverError}</span>
-        </div>
-      )}
-
       {/* Email field */}
       <div className="flex flex-col gap-2">
-        <label
-          htmlFor="email"
-          className="text-sm font-semibold text-slate-700"
-        >
+        <label htmlFor="email" className="text-sm font-semibold text-slate-700">
           Correo electrónico
         </label>
         <input
@@ -79,9 +54,18 @@ export function LoginForm() {
           {...register('email')}
         />
         {errors.email && (
-          <p id="email-error" role="alert" className="flex items-center gap-1.5 text-sm text-red-600">
-            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          <p
+            id="email-error"
+            role="alert"
+            className="flex items-center gap-1.5 text-sm text-red-600"
+          >
+            <svg
+              className="h-3.5 w-3.5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
             </svg>
             {errors.email.message}
           </p>
@@ -90,10 +74,7 @@ export function LoginForm() {
 
       {/* Password field */}
       <div className="flex flex-col gap-2">
-        <label
-          htmlFor="password"
-          className="text-sm font-semibold text-slate-700"
-        >
+        <label htmlFor="password" className="text-sm font-semibold text-slate-700">
           Contraseña
         </label>
         <input
@@ -117,9 +98,18 @@ export function LoginForm() {
           {...register('password')}
         />
         {errors.password && (
-          <p id="password-error" role="alert" className="flex items-center gap-1.5 text-sm text-red-600">
-            <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+          <p
+            id="password-error"
+            role="alert"
+            className="flex items-center gap-1.5 text-sm text-red-600"
+          >
+            <svg
+              className="h-3.5 w-3.5 shrink-0"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
             </svg>
             {errors.password.message}
           </p>
@@ -150,8 +140,19 @@ export function LoginForm() {
               viewBox="0 0 24 24"
               aria-hidden="true"
             >
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
             Ingresando...
           </>

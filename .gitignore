@@ -12,6 +12,11 @@ node_modules
 /.next/
 /out/
 
+# PWA / Serwist — generated service worker files
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker*.js
+
 # Build
 /build
 

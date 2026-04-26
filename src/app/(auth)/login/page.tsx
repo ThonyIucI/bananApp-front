@@ -1,7 +1,7 @@
 import { LoginForm } from '@/modules/auth/components/LoginForm';
 
 // Sprout/leaf SVG icon — represents organic agriculture
-function BananAppIcon() {
+function CultivAppIcon() {
   return (
     <div
       className="flex h-16 w-16 items-center justify-center rounded-2xl shadow-lg"
@@ -33,10 +33,10 @@ export default function LoginPage() {
     <>
       {/* Header */}
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
-        <BananAppIcon />
+        <CultivAppIcon />
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            bananApp
+            CultivApp
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             Ingresa para continuar
@@ -51,7 +51,7 @@ export default function LoginPage() {
 
       {/* Footer */}
       <p className="mt-6 text-center text-xs text-slate-400">
-        Valle del Chira · Cooperativa bananera orgánica
+        Gestión de cultivos para cooperativas agrícolas derechos reservados a @ThonyIucI
       </p>
     </>
   );
