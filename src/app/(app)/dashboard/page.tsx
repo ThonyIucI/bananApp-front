@@ -1,21 +1,87 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
+import {
+  Leaf,
+  CalendarDays,
+  Users,
+  Banana,
+  MapPin,
+  BarChart3,
+  Calendar,
+} from 'lucide-react';
 import { useAuthContext } from '@/modules/auth/context/auth.context';
+import { useStatsOverview } from '@/modules/dashboard/hooks/useStatsOverview';
+import { useStatsMonthly } from '@/modules/dashboard/hooks/useStatsMonthly';
+import { useStatsWeekly } from '@/modules/dashboard/hooks/useStatsWeekly';
+import { useListUserPlots } from '@/modules/users/hooks/useListUserPlots';
+import { KpiCard } from '@/modules/dashboard/components/KpiCard';
+import { MonthlyTrendChart } from '@/modules/dashboard/components/MonthlyTrendChart';
+import { WeeklyTrendChart } from '@/modules/dashboard/components/WeeklyTrendChart';
+import { TopEnfundadoresList } from '@/modules/dashboard/components/TopEnfundadoresList';
+import { TopPlotsList } from '@/modules/dashboard/components/TopPlotsList';
+import { RibbonColorDonut } from '@/modules/dashboard/components/RibbonColorDonut';
+import { APP_ROUTES, PLOT_ROUTES, BUNDLING_ROUTES } from '@/@common/constants/routes';
+
+/** Section card wrapper */
+const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <p className="mb-4 text-sm font-semibold text-gray-700">{title}</p>
+    {children}
+  </div>
+);
+
+/** Full-width skeleton placeholder */
+const ChartSkeleton = ({ height = 'h-64' }: { height?: string }) => (
+  <div className={`${height} animate-pulse rounded-xl bg-gray-100`} />
+);
 
 export default function DashboardPage() {
-  const { user } = useAuthContext();
+  const { user, isSuperadmin } = useAuthContext();
+
+  const cooperative = user?.cooperatives?.[0];
+  const cooperativeId = cooperative?.cooperativeId ?? '';
 
   const userRoles = user?.cooperatives?.flatMap((c) => c.roles) ?? [];
-  const isEnfundador = userRoles.includes('enfundador') || user?.isSuperadmin;
-  const cooperative = user?.cooperatives?.[0];
+  const isAdmin = isSuperadmin || userRoles.includes('admin');
+  const isBagger = !isAdmin && userRoles.includes('enfundador');
+
+  const Overview = useStatsOverview();
+  const Monthly = useStatsMonthly();
+  const Weekly = useStatsWeekly();
+  const UserPlots = useListUserPlots();
+
+  useEffect(() => {
+    if (!cooperativeId) return;
+
+    Promise.all([
+      Overview.handler(cooperativeId),
+      Monthly.handler(cooperativeId, 12),
+      Weekly.handler(
+        cooperativeId,
+        8,
+        isBagger && user ? user.id : undefined,
+      ),
+    ]);
+
+    if (isBagger && user && cooperativeId) {
+      UserPlots.handler({ userId: user.id, cooperativeId });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cooperativeId, isBagger, user?.id]);
+
+  const overview = Overview.data;
+  const months = Monthly.data?.months ?? [];
+  const weeks = Weekly.data?.weeks ?? [];
+  const assignedPlots = UserPlots.data ?? [];
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      {/* Greeting */}
+    <div className="mx-auto max-w-5xl space-y-6 animate-page-in">
+      {/* ── Header ── */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
-          Hola, {user?.fullName?.split(' ')[0]} 👋
+          Hola, {user?.fullName?.split(' ')[0]}
         </h1>
         {cooperative && (
           <p className="mt-1 text-sm text-gray-500">
@@ -27,63 +93,201 @@ export default function DashboardPage() {
             )}
           </p>
         )}
-        {user?.isSuperadmin && (
-          <span className="mt-2 inline-block rounded-full bg-[#27ae60]/10 px-3 py-1 text-xs font-semibold text-[#27ae60]">
-            Superadministrador
-          </span>
+      </div>
+
+      {/* ── Fila 1: KPI Cards ── */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KpiCard
+          icon={Leaf}
+          label="Fundas esta semana"
+          value={overview?.thisWeek.totalQuantity.toLocaleString('es') ?? '—'}
+          description={`${overview?.thisWeek.totalRecords ?? 0} registros`}
+          deltaPct={overview?.thisWeek.deltaPctVsLastPeriod}
+          loading={Overview.loading}
+        />
+        <KpiCard
+          icon={CalendarDays}
+          label="Fundas este mes"
+          value={overview?.thisMonth.totalQuantity.toLocaleString('es') ?? '—'}
+          description={`${overview?.thisMonth.totalRecords ?? 0} registros`}
+          deltaPct={overview?.thisMonth.deltaPctVsLastPeriod}
+          loading={Overview.loading}
+        />
+        <KpiCard
+          icon={Users}
+          label="Enfundadores activos"
+          value={overview?.last30Days.activeEnfundadores ?? '—'}
+          description="últimos 30 días"
+          loading={Overview.loading}
+        />
+        <KpiCard
+          icon={Banana}
+          label="Parcelas activas"
+          value={overview?.last30Days.activePlots ?? '—'}
+          description="últimos 30 días"
+          loading={Overview.loading}
+        />
+      </div>
+
+      {/* ── Fila 2: Tendencia mensual (12 meses) ── */}
+      <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm font-semibold text-gray-700">Tendencia mensual</p>
+          <span className="text-xs text-gray-400">últimos 12 meses</span>
+        </div>
+        {Monthly.loading ? (
+          <ChartSkeleton />
+        ) : (
+          <MonthlyTrendChart data={months} />
         )}
       </div>
 
-      {/* Quick actions */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {isEnfundador && (
+      {/* ── Fila 3: Tendencia semanal + Distribución de cintas ── */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">
+              {isBagger ? 'Mis fundas semanales' : 'Tendencia semanal'}
+            </p>
+            <span className="text-xs text-gray-400">últimas 8 semanas</span>
+          </div>
+          {Weekly.loading ? (
+            <ChartSkeleton height="h-48" />
+          ) : (
+            <WeeklyTrendChart data={weeks} />
+          )}
+        </div>
+
+        <SectionCard title="Distribución de cintas">
+          <RibbonColorDonut
+            data={overview?.ribbonColorDistribution ?? []}
+            loading={Overview.loading}
+          />
+        </SectionCard>
+      </div>
+
+      {/* ── Fila 4: Top enfundadores + Top parcelas (admin) / Mis parcelas (bagger) ── */}
+      {isAdmin ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <SectionCard title="Top enfundadores — últimos 30 días">
+            <TopEnfundadoresList
+              items={overview?.topEnfundadores ?? []}
+              loading={Overview.loading}
+            />
+          </SectionCard>
+
+          <SectionCard title="Top parcelas — últimos 30 días">
+            <TopPlotsList
+              items={overview?.topPlots ?? []}
+              loading={Overview.loading}
+            />
+          </SectionCard>
+        </div>
+      ) : (
+        /* Vista personal del enfundador: sus parcelas asignadas */
+        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">Mis parcelas asignadas</p>
+            <span className="text-xs text-gray-400">{assignedPlots.length} parcelas</span>
+          </div>
+          {UserPlots.loading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-12 animate-pulse rounded-xl bg-gray-100" />
+              ))}
+            </div>
+          ) : assignedPlots.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 py-10">
+              <MapPin className="mb-2 h-8 w-8 text-gray-300" strokeWidth={1.2} />
+              <p className="text-sm text-gray-400">No tienes parcelas asignadas</p>
+              <p className="mt-0.5 text-xs text-gray-300">Contacta a tu administrador</p>
+            </div>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {assignedPlots.map((ap) => (
+                <div
+                  key={ap.id}
+                  className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#27ae60]/10">
+                    <MapPin className="h-4 w-4 text-[#27ae60]" strokeWidth={1.8} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900">{ap.plot.name}</p>
+                    <p className="text-xs text-gray-400">{ap.plot.sector.name}</p>
+                  </div>
+                  {ap.plot.areaHectares > 0 && (
+                    <span className="ml-auto shrink-0 text-xs text-gray-400">
+                      {ap.plot.areaHectares} ha
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Fila 5: Quick actions (admin) / Acciones del enfundador ── */}
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+        {(isBagger || !isAdmin) && (
           <Link
-            href="/enfundado/nuevo"
-            className="group flex items-start gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:border-[#27ae60]/30 hover:shadow-md"
+            href={APP_ROUTES.BUNDLING_NEW}
+            className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:border-[#27ae60]/30 hover:shadow-md active:scale-[0.97]"
           >
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[#27ae60]/10 transition-colors group-hover:bg-[#27ae60]/20">
-              <svg className="h-5 w-5 text-[#27ae60]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#27ae60]/10 transition-colors group-hover:bg-[#27ae60]/20">
+              <Leaf className="h-5 w-5 text-[#27ae60]" />
             </div>
             <div>
-              <p className="font-semibold text-gray-900">Registrar enfunde</p>
-              <p className="mt-0.5 text-sm text-gray-500">Ingresa los datos del enfundado</p>
+              <p className="text-sm font-semibold text-gray-900">Registrar enfunde</p>
+              <p className="text-xs text-gray-400">Nuevo registro de hoy</p>
             </div>
           </Link>
         )}
 
-        <div className="flex items-start gap-4 rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gray-100">
-            <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
-            </svg>
+        <Link
+          href={BUNDLING_ROUTES.LIST}
+          className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:border-[#27ae60]/30 hover:shadow-md active:scale-[0.97]"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#27ae60]/10 transition-colors group-hover:bg-[#27ae60]/20">
+            <BarChart3 className="h-5 w-5 text-[#27ae60]" />
           </div>
           <div>
-            <p className="font-semibold text-gray-400">Historial</p>
-            <p className="mt-0.5 text-sm text-gray-400">Próximamente</p>
+            <p className="text-sm font-semibold text-gray-900">Historial de enfundes</p>
+            <p className="text-xs text-gray-400">Ver todos los registros</p>
           </div>
-        </div>
-      </div>
+        </Link>
 
-      {/* Roles */}
-      {userRoles.length > 0 && (
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-            Tus roles
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {userRoles.map((role) => (
-              <span
-                key={role}
-                className="rounded-full bg-[#27ae60]/10 px-3 py-1 text-xs font-medium capitalize text-[#27ae60]"
-              >
-                {role.replace('_', ' ')}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+        {isAdmin && (
+          <>
+            <Link
+              href={PLOT_ROUTES.LIST}
+              className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:border-[#27ae60]/30 hover:shadow-md active:scale-[0.97]"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#27ae60]/10 transition-colors group-hover:bg-[#27ae60]/20">
+                <MapPin className="h-5 w-5 text-[#27ae60]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Asignar parcelas</p>
+                <p className="text-xs text-gray-400">Gestión de enfundadores</p>
+              </div>
+            </Link>
+
+            <Link
+              href={APP_ROUTES.RIBBON_CALENDAR}
+              className="group flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-all hover:border-[#27ae60]/30 hover:shadow-md active:scale-[0.97]"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#27ae60]/10 transition-colors group-hover:bg-[#27ae60]/20">
+                <Calendar className="h-5 w-5 text-[#27ae60]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Calendario de cintas</p>
+                <p className="text-xs text-gray-400">Semana actual y próximas</p>
+              </div>
+            </Link>
+          </>
+        )}
+      </div>
     </div>
   );
 }
