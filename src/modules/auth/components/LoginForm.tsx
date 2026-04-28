@@ -62,7 +62,7 @@ export function LoginForm() {
         isLoading={isPending}
         className='h-12 font-bold'
       >
-        Ingresar
+        {isPending ? 'Ingresando...' : 'Ingresar'}
       </Button>
     </form>
   );
