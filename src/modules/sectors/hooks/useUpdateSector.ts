@@ -5,19 +5,15 @@ import { toast } from 'react-toastify';
 import {
   updateSectorRequest,
   type UpdateSectorPayload,
-  type SectorResponse,
 } from '../services/sector.service';
 
-export function useUpdateSector(): {
-  loading: boolean;
-  handler: (id: string, payload: UpdateSectorPayload) => Promise<SectorResponse | null>;
-} {
-  const { loading, handler } = useRequest<SectorResponse, [string, UpdateSectorPayload]>(
+export function useUpdateSector() {
+  const { loading, handler } = useRequest(
     false,
-    async (id, payload) => {
-      const result = await updateSectorRequest(id, payload);
-      toast.success(`Sector "${result.name}" actualizado`);
-      return result;
+    async (id: string, payload: UpdateSectorPayload) => {
+      const { data } = await updateSectorRequest(id, payload);
+      toast.success(`Sector "${data?.name?? ''}" actualizado`);
+      return data;
     },
   );
 
