@@ -3,16 +3,35 @@ export interface LoginCredentials {
   password: string;
 }
 
+export interface CooperativeMembership {
+  cooperativeId: string;
+  cooperativeName: string;
+  memberCode: string | null;
+  roles: string[];
+}
+
 export interface AuthUser {
   id: string;
-  email: string;
+  firstName: string;
+  lastName: string;
   fullName: string;
+  email: string;
+  dni: string | null;
+  isActive: boolean;
   isSuperadmin: boolean;
+  mustChangePassword: boolean;
+  createdAt: string;
+  cooperatives: CooperativeMembership[];
 }
 
 export interface LoginResponse {
   accessToken: string;
-  user: AuthUser;
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    isSuperadmin: boolean;
+  };
 }
 
 export interface ApiResponse<T> {

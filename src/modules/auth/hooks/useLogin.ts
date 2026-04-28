@@ -1,35 +1,37 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState, useTransition } from 'react';
-import { loginRequest } from '../services/auth.service';
+import { loginRequest, getProfileRequest } from '../services/auth.service';
 import type { LoginFormValues } from '../schemas/login.schema';
 import { useAuthContext } from '../context/auth.context';
-import { ApiError } from '@/lib/api/client';
+import useRequest from '@/@common/hooks/useRequest';
+import { APP_ROUTES } from '@/@common/constants/routes';
+import type { AuthUser } from '../types/auth.types';
+
+const ACCESS_TOKEN_KEY = 'cultiv_at';
 
 export function useLogin() {
   const router = useRouter();
   const { setSession } = useAuthContext();
-  const [isPending, startTransition] = useTransition();
-  const [serverError, setServerError] = useState<string | null>(null);
 
-  const login = (values: LoginFormValues) => {
-    setServerError(null);
+  const { loading, handler } = useRequest<AuthUser, [LoginFormValues]>(
+    false,
+    async (values) => {
+      const loginResult = await loginRequest(values);
 
-    startTransition(async () => {
-      try {
-        const result = await loginRequest(values);
-        setSession(result.user, result.accessToken);
-        router.push('/dashboard');
-      } catch (error) {
-        if (error instanceof ApiError) {
-          setServerError(error.message);
-        } else {
-          setServerError('Error de conexión. Verifica tu internet e intenta de nuevo.');
-        }
-      }
-    });
-  };
+      // Store token so apiClient interceptor can attach it to the profile request
+      localStorage.setItem(
+        ACCESS_TOKEN_KEY,
+        JSON.stringify({ token: loginResult.accessToken, user: loginResult.user }),
+      );
 
-  return { login, isPending, serverError };
+      const profile = await getProfileRequest();
+
+      setSession(profile, loginResult.accessToken);
+      router.push(APP_ROUTES.DASHBOARD);
+      return profile;
+    },
+  );
+
+  return { login: handler, isPending: loading };
 }

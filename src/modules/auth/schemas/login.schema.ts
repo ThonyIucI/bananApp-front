@@ -1,10 +1,7 @@
 import { z } from 'zod';
 
 export const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'El correo es requerido')
-    .email('Ingresa un correo válido'),
+  email: z.email('Ingresa un correo válido'),
   password: z
     .string()
     .min(1, 'La contraseña es requerida')
