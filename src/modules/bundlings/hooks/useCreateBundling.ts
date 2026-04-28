@@ -3,98 +3,187 @@
 import useRequest from '@/@common/hooks/useRequest';
 import { enqueueBundling } from '@/lib/offline/sync-manager';
 import { toast } from 'react-toastify';
+import { ApiError } from '@/lib/api/client';
 import {
   createBundlingRequest,
+  isBundlingArray,
   type CreateBundlingPayload,
   type BundlingResponse,
+  type SubPlotEntryPayload,
 } from '../services/bundling.service';
 
 /**
- * Creates a bundling record.
+ * Creates one or multiple bundling records.
  *
- * When online: calls the API directly and stores the result in the sync queue
- * as 'synced' (for offline history display).
+ * Single mode (no subPlotEntries):
+ *   - Online → POST → BundlingResponse
+ *   - Offline → enqueue 1 item → synthetic BundlingResponse
  *
- * When offline (or on network failure): enqueues the payload as 'pending'
- * and shows a tactile + visual confirmation to the user.
+ * Multi mode (subPlotEntries present):
+ *   - Online → 1 POST with array → BundlingResponse[]
+ *   - Offline → enqueue N items (one per entry) → synthetic BundlingResponse[]
+ *
+ * Network errors while online are treated as offline (item(s) enqueued).
  */
-export function useCreateBundling(): {
+export const useCreateBundling = (): {
   loading: boolean;
-  handler: (payload: CreateBundlingPayload) => Promise<BundlingResponse | null>;
-} {
-  const { loading, handler } = useRequest<BundlingResponse, [CreateBundlingPayload]>(
-    false,
-    async (payload) => {
-      const isOnline = navigator.onLine;
+  handler: (payload: CreateBundlingPayload) => Promise<BundlingResponse | BundlingResponse[] | null>;
+} => {
+  const { loading, handler } = useRequest<
+    BundlingResponse | BundlingResponse[] | null,
+    [CreateBundlingPayload]
+  >(false, async (payload) => {
+    const isMulti = (payload.subPlotEntries?.length ?? 0) > 0;
+    const isOnline = navigator.onLine;
 
-      if (!isOnline) {
-        await enqueueBundling({
-          localUuid: payload.localUuid,
-          payload,
-          status: 'pending',
-          attempts: 0,
-          createdAt: new Date().toISOString(),
-        });
+    if (isMulti) {
+      return isOnline
+        ? handleMultiOnline(payload)
+        : handleMultiOffline(payload);
+    }
+    return isOnline ? handleSingleOnline(payload) : handleSingleOffline(payload);
+  });
 
-        navigator.vibrate?.(200);
-        toast.info('Guardado offline. Se sincronizará al volver la conexión.', { autoClose: 5000 });
+  return { loading, handler };
+};
 
-        // Return a synthetic response so the calling component can do optimistic UI
-        return buildOfflineResponse(payload);
-      }
+// ─── Single mode ──────────────────────────────────────────────────────────────
 
-      try {
-        const result = await createBundlingRequest(payload);
+const handleSingleOnline = async (
+  payload: CreateBundlingPayload,
+): Promise<BundlingResponse | null> => {
+  try {
+    const result = await createBundlingRequest(payload);
+    const single = isBundlingArray(result) ? result[0] : result;
 
-        // Store in queue as synced — lets the offline-first list show today's records
-        await enqueueBundling({
-          localUuid: payload.localUuid,
-          payload,
+    await enqueueBundling({
+      localUuid: payload.localUuid!,
+      payload: payload as Required<Pick<CreateBundlingPayload, 'localUuid'>> & CreateBundlingPayload,
+      status: 'synced',
+      attempts: 0,
+      createdAt: new Date().toISOString(),
+      syncedAt: new Date().toISOString(),
+    }).catch(() => {});
+
+    toast.success(`Enfunde registrado: ${single.quantity} fundas en ${single.plot.name}`, {
+      autoClose: 5000,
+    });
+    return single;
+  } catch (err) {
+    if (err instanceof ApiError && err.status >= 400) {
+      toast.error(err.message, { autoClose: 7000 });
+      return null;
+    }
+    return handleSingleOffline(payload);
+  }
+};
+
+const handleSingleOffline = async (
+  payload: CreateBundlingPayload,
+): Promise<BundlingResponse> => {
+  await enqueueBundling({
+    localUuid: payload.localUuid!,
+    payload: payload as Required<Pick<CreateBundlingPayload, 'localUuid'>> & CreateBundlingPayload,
+    status: 'pending',
+    attempts: 0,
+    createdAt: new Date().toISOString(),
+  });
+  navigator.vibrate?.(200);
+  toast.info('Guardado offline. Se sincronizará al volver la conexión.', { autoClose: 5000 });
+  return buildOfflineResponse(payload);
+};
+
+// ─── Multi mode ───────────────────────────────────────────────────────────────
+
+const handleMultiOnline = async (
+  payload: CreateBundlingPayload,
+): Promise<BundlingResponse[] | null> => {
+  try {
+    const result = await createBundlingRequest(payload);
+    const arr = isBundlingArray(result) ? result : [result];
+
+    await Promise.all(
+      arr.map((b, i) => {
+        const entry = payload.subPlotEntries![i];
+        return enqueueBundling({
+          localUuid: b.localUuid,
+          payload: buildEntryPayload(payload, entry),
           status: 'synced',
           attempts: 0,
           createdAt: new Date().toISOString(),
           syncedAt: new Date().toISOString(),
         }).catch(() => {});
+      }),
+    );
 
-        toast.success(
-          `Enfunde registrado: ${result.quantity} fundas en ${result.plot.name}`,
-          { autoClose: 5000 },
-        );
-        return result;
-      } catch {
-        // Network failure while online — queue as pending and inform user
-        await enqueueBundling({
-          localUuid: payload.localUuid,
-          payload,
-          status: 'pending',
-          attempts: 0,
-          createdAt: new Date().toISOString(),
-        });
+    toast.success(`${arr.length} enfundes registrados`, { autoClose: 5000 });
+    return arr;
+  } catch (err) {
+    if (err instanceof ApiError && err.status >= 400) {
+      toast.error(err.message, { autoClose: 7000 });
+      return null;
+    }
+    return handleMultiOffline(payload);
+  }
+};
 
-        navigator.vibrate?.(200);
-        toast.info('Error de red. Enfunde guardado localmente y se sincronizará pronto.', {
-          autoClose: 6000,
-        });
-        return buildOfflineResponse(payload);
-      }
-    },
+const handleMultiOffline = async (
+  payload: CreateBundlingPayload,
+): Promise<BundlingResponse[]> => {
+  const entries = payload.subPlotEntries!;
+  const results: BundlingResponse[] = [];
+
+  for (const entry of entries) {
+    const singlePayload = buildEntryPayload(payload, entry);
+    await enqueueBundling({
+      localUuid: entry.localUuid,
+      payload: singlePayload,
+      status: 'pending',
+      attempts: 0,
+      createdAt: new Date().toISOString(),
+    });
+    results.push(buildOfflineResponse(singlePayload));
+  }
+
+  navigator.vibrate?.(200);
+  toast.info(
+    `${entries.length} enfundes guardados offline. Se sincronizarán al volver la conexión.`,
+    { autoClose: 5000 },
   );
+  return results;
+};
 
-  return { loading, handler };
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Builds a synthetic BundlingResponse from an offline payload for optimistic UI. */
+/** Reconstructs a single-mode payload from a multi-mode entry. */
+const buildEntryPayload = (
+  base: CreateBundlingPayload,
+  entry: SubPlotEntryPayload,
+): CreateBundlingPayload => ({
+  cooperativeId: base.cooperativeId,
+  plotId: base.plotId,
+  bundledAt: base.bundledAt,
+  subPlotId: entry.subPlotId,
+  enfundadorUserId: entry.enfundadorUserId,
+  quantity: entry.quantity,
+  localUuid: entry.localUuid,
+  ribbonColorFree: entry.ribbonColorFree,
+  ribbonCalendarId: entry.ribbonCalendarId,
+  notes: entry.notes,
+});
+
+/** Builds a synthetic BundlingResponse from a single-mode payload for optimistic UI. */
 const buildOfflineResponse = (payload: CreateBundlingPayload): BundlingResponse => ({
-  id: payload.localUuid,
-  quantity: payload.quantity,
+  id: payload.localUuid!,
+  quantity: payload.quantity ?? 0,
   bundledAt: payload.bundledAt,
   ribbonColorFree: payload.ribbonColorFree ?? null,
   ribbonCalendar: null,
   notes: payload.notes ?? null,
-  localUuid: payload.localUuid,
+  localUuid: payload.localUuid!,
   syncedAt: null,
   createdAt: new Date().toISOString(),
   plot: { id: payload.plotId, name: '' },
   subPlot: null,
-  enfundadorUser: { id: payload.enfundadorUserId, fullName: '' },
+  enfundadorUser: { id: payload.enfundadorUserId ?? '', fullName: '' },
 });
