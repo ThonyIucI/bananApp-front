@@ -28,18 +28,21 @@ export const Select = React.forwardRef<any, CustomSelectProps>(({
     return (
         <div className={cn('flex flex-col gap-1', className)}>
             {label && (
-                <label className="block text-xs font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700">
                     {label}
                 </label>
             )}
             <Component
                 ref={ref}
                 classNames={{
-                    control: ({ isFocused }) => cn(
-                        '!rounded-xl !border !px-2 !py-0.5 !text-sm !shadow-none !min-h-[38px] !flex !items-center',
-                        isFocused ? '!border-[#27ae60] !ring-2 !ring-[#27ae60]/20' : '!border-gray-200',
+                    control: ({ isFocused, isDisabled }) => cn(
+                        '!rounded-md !border !px-2 !py-0.5 !text-sm !shadow-none !min-h-[38px] !flex !items-center',
+                        isDisabled ? '!opacity-60 !cursor-not-allowed' : '!cursor-pointer',
+                        isFocused ? '!border-[#27ae60] !ring-2 !ring-[#27ae60]/20' : 
+                        '!border-gray-300 hover:!border-gray-400 focus:!border-[#27ae60] focus:!ring-2 focus:!ring-[#27ae60]/20 ',
                         error ? '!border-red-400' : '',
-                        size === 'sm' ? '!px-2 !min-h-[28px]' : ''
+                        size === 'sm' ? '!px-2 !min-h-[28px]' : '',
+                        
                     ),
                     option: ({ isFocused, isSelected }) => cn(
                         '!cursor-pointer !px-4 !py-2 !text-sm !bg-white',
@@ -47,16 +50,17 @@ export const Select = React.forwardRef<any, CustomSelectProps>(({
                         isFocused && !isSelected ? '!bg-gray-50' : '',
                         !isSelected && !isFocused ? '!text-gray-700' : ''
                     ),
-                    menu: () => '!rounded-xl !border !border-gray-100 !shadow-lg !mt-1 !overflow-hidden bg-white',
+                    menu: () => '!rounded-md !border !border-gray-200 !shadow-lg !mt-1 !overflow-hidden bg-white',
+                    menuPortal: () => '!z-100',
                     placeholder: () => '!text-gray-400',
                     singleValue: () => '!text-gray-900',
-                    multiValue: () => '!rounded-lg !bg-[#27ae60]/10',
+                    multiValue: () => '!rounded-md !bg-[#27ae60]/10',
                     multiValueLabel: () => '!text-[#27ae60] !font-medium !text-xs !px-2 !py-0.5',
                     multiValueRemove: () => '!rounded-r-lg !text-[#27ae60] hover:!bg-[#27ae60]/20 hover:!text-[#219a52] !px-1',
                     input: () => '!m-0 !p-0',
                     valueContainer: () => '!p-0 !gap-1',
                     noOptionsMessage: () => 'bg-white !text-gray-400 p-2',
-                    dropdownIndicator: ({ isFocused }) => cn(isFocused ? '!text-[#27ae60]' : '!text-gray-400'),
+                    dropdownIndicator: ({ isFocused }) => cn(isFocused ? '!text-[#27ae60]' : '!text-gray-300 hover:!text-gray-400'),
                     clearIndicator: () => '!text-gray-400 hover:!text-gray-600',
                 }}
                 unstyled

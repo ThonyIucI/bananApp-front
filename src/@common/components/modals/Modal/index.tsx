@@ -56,7 +56,8 @@ export const Modal = ({ open, onClose, title, children, footer, maxWidth = 'md' 
         <div className="max-h-[65vh] overflow-y-auto px-6 py-4">{children}</div>
 
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4">
+          <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4 
+                shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] sm:shadow-none">
             {footer}
           </div>
         )}
