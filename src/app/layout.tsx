@@ -5,6 +5,7 @@ import './globals.css';
 import 'react-toastify/dist/ReactToastify.css';
 import { AuthProvider } from '@/modules/auth/context/auth.context';
 import { PageTransition } from '@/@common/components/PageTransition';
+import { OfflineProvider } from '@/lib/offline/OfflineProvider';
 
 const geist = Geist({
   variable: '--font-geist-sans',
@@ -41,9 +42,11 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${geist.variable} h-full antialiased`}>
       <body className="min-h-full font-sans">
+        <OfflineProvider>
           <AuthProvider>
             <PageTransition>{children}</PageTransition>
           </AuthProvider>
+        </OfflineProvider>
         <ToastContainer
           position="top-right"
           autoClose={5000}
@@ -53,6 +56,7 @@ export default function RootLayout({
           draggable={false}
           theme="light"
         />
+        <div id="overlays"></div>
       </body>
     </html>
   );
