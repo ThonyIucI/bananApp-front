@@ -15,6 +15,7 @@ import { RIBBON_COLOR_HEX, RIBBON_COLOR_LABELS } from '@/@common/constants/ribbo
 import type { RibbonColor } from '@/@common/constants/ribbon-colors';
 import { formatDate } from '@/@common/utils/date';
 import type { BundlingResponse } from '@/modules/bundlings/services/bundling.service';
+import { isBundlingArray } from '@/modules/bundlings/services/bundling.service';
 import { getQueuedBundlings } from '@/lib/offline/sync-manager';
 import type { QueuedBundling } from '@/lib/offline/db';
 
@@ -95,9 +96,13 @@ const EnfundadoPage = () => {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleSaved = (b: BundlingResponse) => {
-    ListBundlings.onUpsert(b);
-    // Refresh queue so the new item shows "Pendiente" if it was offline
+  const handleSaved = (b: BundlingResponse | BundlingResponse[]) => {
+    if (isBundlingArray(b)) {
+      b.forEach((item) => ListBundlings.onUpsert(item));
+    } else {
+      ListBundlings.onUpsert(b);
+    }
+    // Refresh queue so new items show "Pendiente" if they were offline
     getQueuedBundlings()
       .then(setQueuedItems)
       .catch(() => {});
@@ -194,7 +199,7 @@ const EnfundadoPage = () => {
                       <span className="text-gray-400 text-xs italic">(parcela pendiente)</span>
                     </td>
                     <td className="px-5 py-3 text-gray-600">—</td>
-                    <td className="px-5 py-3 text-gray-900">{q.payload.quantity.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-gray-900">{(q.payload.quantity ?? 0).toLocaleString()}</td>
                     <td className="px-5 py-3">
                       {q.payload.ribbonColorFree ? (
                         <span className="flex items-center gap-1.5">
@@ -259,7 +264,7 @@ const EnfundadoPage = () => {
                   </div>
                   <div className="ml-3 flex items-center gap-2">
                     <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900">{q.payload.quantity.toLocaleString()} fundas</p>
+                      <p className="text-sm font-bold text-gray-900">{(q.payload.quantity ?? 0).toLocaleString()} fundas</p>
                     </div>
                     <PendingBadge status={q.status} />
                   </div>
@@ -320,6 +325,7 @@ const EnfundadoPage = () => {
           plots={plots}
           users={users}
           userId={user?.id}
+          isAdmin={isSuperadmin}
           cooperativeId={cooperativeId}
           bundling={editTarget}
         />

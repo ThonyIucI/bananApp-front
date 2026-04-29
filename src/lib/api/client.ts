@@ -19,6 +19,18 @@ function createApiClient(): AxiosInstance {
     withCredentials: true,
     headers: { 'Content-Type': 'application/json' },
     timeout: 15_000,
+    // Serialize arrays as repeated params: plotIds=a&plotIds=b
+    paramsSerializer: (params: Record<string, unknown>) => {
+      const sp = new URLSearchParams();
+      for (const [key, value] of Object.entries(params)) {
+        if (Array.isArray(value)) {
+          value.forEach((v) => sp.append(key, String(v)));
+        } else if (value !== undefined && value !== null) {
+          sp.append(key, String(value));
+        }
+      }
+      return sp.toString();
+    },
   });
 
   instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
