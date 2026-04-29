@@ -3,6 +3,7 @@
 import { Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useOnlineStatus } from '@/lib/offline/hooks/useOnlineStatus';
 import { usePendingSync } from '@/lib/offline/hooks/usePendingSync';
+import { useBoolean } from '@/@common/hooks/useBoolean';import { useEffect } from 'react';
 
 /**
  * Floating pill that shows connectivity status and pending sync count.
@@ -15,9 +16,14 @@ import { usePendingSync } from '@/lib/offline/hooks/usePendingSync';
  */
 export const OfflineIndicator = () => {
   const isOnline = useOnlineStatus();
+  const isMounted=useBoolean()
   const { pendingCount, failedCount, isSyncing, syncNow } = usePendingSync();
 
   const totalPending = pendingCount + failedCount;
+  
+  useEffect(() => {
+    isMounted.on();
+  }, []);
 
   // Nothing to show: online and nothing to sync
   if (isOnline && totalPending === 0) return null;
@@ -33,6 +39,10 @@ export const OfflineIndicator = () => {
     : `${totalPending} pendiente${totalPending !== 1 ? 's' : ''}`;
 
   const Icon = isOnline ? Wifi : WifiOff;
+
+  if (!isMounted.active) return null;
+
+  if (isOnline && totalPending === 0) return null;
 
   return (
     <div className="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2">
