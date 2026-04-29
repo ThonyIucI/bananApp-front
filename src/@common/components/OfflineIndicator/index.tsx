@@ -7,6 +7,7 @@ import { usePendingSync } from '@/lib/offline/hooks/usePendingSync';
 import { getQueuedBundlings } from '@/lib/offline/sync-manager';
 import type { QueuedBundling } from '@/lib/offline/db';
 import { PendingBundlingsPanel } from './PendingBundlingsPanel';
+import { useBoolean } from '@/@common/hooks/useBoolean';
 
 /**
  * Floating pill showing connectivity and pending sync count.
@@ -14,11 +15,16 @@ import { PendingBundlingsPanel } from './PendingBundlingsPanel';
  */
 export const OfflineIndicator = () => {
   const isOnline = useOnlineStatus();
+  const isMounted=useBoolean()
   const { pendingCount, failedCount, isSyncing, syncNow } = usePendingSync();
   const [panelOpen, setPanelOpen] = useState(false);
   const [queuedItems, setQueuedItems] = useState<QueuedBundling[]>([]);
 
   const totalPending = pendingCount + failedCount;
+  
+  useEffect(() => {
+    isMounted.on();
+  }, []);
 
   const refreshQueue = () => {
     getQueuedBundlings()
@@ -47,6 +53,10 @@ export const OfflineIndicator = () => {
   const handlePillClick = () => {
     if (totalPending > 0) setPanelOpen((v) => !v);
   };
+
+  if (!isMounted.active) return null;
+
+  if (isOnline && totalPending === 0) return null;
 
   return (
     <div className="pointer-events-none fixed bottom-5 left-1/2 z-50 -translate-x-1/2">
