@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Unauthenticated access to protected routes is handled client-side
 // via SessionExpiredModal so the user sees a proper dialog instead of
 // a hard redirect.
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hasSession = request.cookies.has('refreshToken');
 
