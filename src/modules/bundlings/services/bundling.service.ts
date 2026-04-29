@@ -188,12 +188,8 @@ export const listBundlingsRequest = async (
  * - Without subPlotEntries → single mode → returns BundlingResponse
  * - With subPlotEntries → multi mode → returns BundlingResponse[]
  */
-export const createBundlingRequest = async (
-  payload: CreateBundlingPayload,
-): Promise<BundlingResponse | BundlingResponse[]> => {
-  const res = await apiClient.post<BundlingResponse | BundlingResponse[]>('/bundlings', payload);
-  return res.data;
-};
+export const createBundlingRequest = (payload: CreateBundlingPayload) => 
+  apiClient.post<BundlingResponse>('/bundlings', payload);
 
 /** Updates a bundling record. `cooperativeId` is sent as a query param for the guard. */
 export const updateBundlingRequest = async (
