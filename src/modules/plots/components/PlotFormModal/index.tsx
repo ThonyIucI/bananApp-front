@@ -18,23 +18,6 @@ import type { UserResponse } from '@/modules/users/services/user.service';
 import type { PlotResponse } from '../../services/plot.service';
 import { PLOT_FORM_DEFAULT_VALUES, PlotFormValues } from './constants';
 
-interface SubPlotRow {
-  id?: string;
-  name: string;
-  areaHectares: string;
-  responsibleUserId: string;
-}
-
-// interface PlotFormValues {
-//   name: string;
-//   sectorId: string;
-//   ownerUserId: string;
-//   workerUserId: string;
-//   areaHectares: string;
-//   cadastralCode: string;
-//   subPlots: SubPlotRow[];
-// }
-
 interface PlotFormModalProps {
   open: boolean;
   onClose: () => void;
@@ -152,17 +135,22 @@ export const PlotFormModal = ({
       onClose={onClose}
       title={isEdit ? 'Editar parcela' : 'Nueva parcela'}
       footer={
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={onClose} disabled={isSaving || fetching}>
+        <div className="flex w-full sm:w-auto justify-end gap-2 px-1 pb-1">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isSaving || fetching}
+            className="flex-1 sm:flex-none h-11 sm:h-9 sm:px-4"
+          >
             Cancelar
           </Button>
           <Button
             type="submit"
             form="plot-form"
             disabled={isSaving || fetching}
-            className="bg-[#27ae60] hover:bg-[#219a52]"
+            isLoading={isSaving || fetching}
+            className="flex-1 sm:flex-none h-11 sm:h-9 sm:px-4"
           >
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isEdit ? 'Guardar cambios' : 'Crear parcela'}
           </Button>
         </div>
@@ -190,11 +178,11 @@ export const PlotFormModal = ({
               render={({ field }) => (
                 <Select
                   label="Sector"
-                  required
                   error={errors.sectorId?.message}
                   options={sectorOptions}
                   value={sectorOptions.find((o) => o.value === field.value)}
                   onChange={(opt) => field.onChange((opt as IOption)?.value)}
+                  menuPortalTarget={document.getElementById("overlays")}
                 />
               )}
             />
@@ -234,14 +222,16 @@ export const PlotFormModal = ({
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Área (ha)"
+              placeholder="0"
               required
               type="number"
               step="0.0001"
               error={errors.areaHectares?.message}
-              {...register('areaHectares', { required: 'Requerido' })}
+              {...register('areaHectares', { required: 'Requerido', min: { value: 0, message: 'Valor no válido' } })}
             />
             <Input
               label="Cód. catastral"
+              placeholder='Ingresa el código'
               {...register('cadastralCode')}
             />
           </div>

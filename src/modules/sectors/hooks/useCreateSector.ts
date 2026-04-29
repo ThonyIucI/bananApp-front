@@ -8,7 +8,6 @@ import {
   type SectorResponse,
 } from '../services/sector.service';
 
-/** Creates a sector under a cooperative. Toasts on success. */
 export function useCreateSector(): {
   loading: boolean;
   handler: (cooperativeId: string, payload: CreateSectorPayload) => Promise<SectorResponse | null>;

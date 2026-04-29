@@ -46,13 +46,8 @@ export async function createSectorRequest(
 }
 
 /** Updates a sector's name. */
-export async function updateSectorRequest(
-  id: string,
-  payload: UpdateSectorPayload,
-): Promise<SectorResponse> {
-  const res = await apiClient.patch<SectorResponse>(`/sectors/${id}`, payload);
-  return res.data;
-}
+export const updateSectorRequest = (id: string, payload: UpdateSectorPayload) => 
+  apiClient.patch<SectorResponse>(`/sectors/${id}`, payload);
 
 /** Soft-deletes a sector by id. */
 export async function deleteSectorRequest(id: string): Promise<void> {

@@ -4,7 +4,6 @@ import useRequest from '@/@common/hooks/useRequest';
 import { toast } from 'react-toastify';
 import { deleteSectorRequest } from '../services/sector.service';
 
-/** Soft-deletes a sector. Toasts on success. */
 export function useDeleteSector(): {
   loading: boolean;
   handler: (id: string) => Promise<null>;

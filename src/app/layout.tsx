@@ -56,6 +56,7 @@ export default function RootLayout({
           draggable={false}
           theme="light"
         />
+        <div id="overlays"></div>
       </body>
     </html>
   );

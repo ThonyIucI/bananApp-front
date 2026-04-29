@@ -94,7 +94,7 @@
   }
 }
 
-.animate-page-in {
+/* .animate-page-in {
   animation: page-in 180ms ease-out both;
 }
 
@@ -102,7 +102,7 @@
   .animate-page-in {
     animation: none;
   }
-}
+} */
 
 @keyframes cell-in {
   from {

@@ -13,7 +13,6 @@ export interface ListUserPlotsArgs {
 
 /**
  * Lists active plot assignments for a user scoped to a cooperative.
- * Call handler() in component useEffect with the required args.
  */
 export const useListUserPlots = () => {
   const { loading, data, handler, setData } = useRequest<UserPlotResponse[], [ListUserPlotsArgs]>(

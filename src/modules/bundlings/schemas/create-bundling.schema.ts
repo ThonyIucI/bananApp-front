@@ -6,8 +6,10 @@ const today = () => new Date().toISOString().split('T')[0];
 
 /** Schema for a single subplot row in multi-mode submit. */
 export const subPlotEntryRowSchema = z.object({
-  subPlotId: z.string().uuid(),
   included: z.boolean(),
+  plotId: z.uuid({ error: 'Selecciona una parcela' }),
+  subPlotId: z.string().uuid({ message: 'Selecciona una subparcela' }).optional(),
+  enfundadorUserId: z.uuid({ error: 'Selecciona un enfundador' }),
   quantity: z
     .number({ error: 'Debe ser un número' })
     .int('Debe ser un número entero')
@@ -16,7 +18,10 @@ export const subPlotEntryRowSchema = z.object({
   ribbonColorFree: z.enum(RIBBON_COLORS, { message: 'Selecciona un color' }),
   notes: z.string().max(500, 'Máximo 500 caracteres').optional(),
   localUuid: z.string().uuid(),
-  enfundadorUserId: z.string().uuid(),
+  bundledAt: z
+    .string()
+    .min(1, 'La fecha es requerida')
+    .refine((d) => d <= today(), 'La fecha no puede ser futura'),
 });
 
 export const createBundlingSchema = z
