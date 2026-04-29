@@ -8,7 +8,7 @@ export function extractErrorMessage(error: AxiosError): string {
     if (Array.isArray(data.message)) return (data.message as string[]).join('. ');
     if (typeof data.message === 'string') return data.message;
   }
-
+const isOnline = navigator.onLine;
   switch (error.response?.status) {
     case 401:
       return 'Sesión expirada. Vuelve a ingresar.';
@@ -21,7 +21,8 @@ export function extractErrorMessage(error: AxiosError): string {
     case 500:
       return 'Error interno del servidor. Intenta de nuevo más tarde.';
     default:
-      if (!error.response) return 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+      if (!isOnline) return 'Error de conexión. Verifica tu internet e intenta de nuevo.';
+      if (!error.response) return 'Error en el servidor.';
       return 'Error inesperado. Intenta de nuevo.';
   }
 }
