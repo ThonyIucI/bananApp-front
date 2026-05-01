@@ -11,30 +11,35 @@ interface PlotDetailPanelProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** When false, hides the edit/delete action buttons. Defaults to true. */
+  // TODO: validate permissions individually when refactor roles and permissions
+  canEdit?: boolean;
 }
 
 /** Slide-in panel showing full plot info and internal subPlots. */
-export const PlotDetailPanel = ({ plot, onClose, onEdit, onDelete }: PlotDetailPanelProps) => (
+export const PlotDetailPanel = ({ plot, onClose, onEdit, onDelete, canEdit = true }: PlotDetailPanelProps) => (
   <DetailPanel
     title={plot.name}
     subtitle={plot.sector.name}
     onClose={onClose}
     headerActions={
-      <>
-        <Button type="button" variant="ghost" size="icon-sm" onClick={onEdit} title="Editar">
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          onClick={onDelete}
-          title="Eliminar"
-          className="hover:bg-red-50 hover:text-red-500"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </>
+      canEdit ? (
+        <>
+          <Button type="button" variant="ghost" size="icon-sm" onClick={onEdit} title="Editar">
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onDelete}
+            title="Eliminar"
+            className="hover:bg-red-50 hover:text-red-500"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </>
+      ) : undefined
     }
   >
     <div className="space-y-4">

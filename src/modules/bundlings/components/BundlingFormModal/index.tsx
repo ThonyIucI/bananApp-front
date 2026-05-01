@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useForm, Controller, useWatch, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ListChecks, Package2, TriangleAlert } from 'lucide-react';
 import {
   createBundlingSchema,
   type CreateBundlingFormValues,
@@ -15,21 +16,26 @@ import { useUpdateBundling } from '../../hooks/useUpdateBundling';
 import { Modal } from '@/@common/components/modals/Modal';
 import { Input } from '@/@common/components/form/Input';
 import { Select } from '@/@common/components/form/Select';
+import { Button } from '@/components/ui/button';
+import { FormFieldset } from '@/@common/components/form/FormFieldset';
 import type { IOption } from '@/@common/types/IOption';
-import type { PlotResponse } from '@/modules/plots/services/plot.service';
 import { useGetPlot } from '@/modules/plots/hooks/useGetPlot';
 import type { UserResponse } from '@/modules/users/services/user.service';
 import type { BundlingResponse } from '../../services/bundling.service';
 import { useBoolean } from '@/@common/hooks/useBoolean';
 import { ConfirmCloseDialog } from '@/@common/components/modals/ConfirmCloseDialog';
 import { SubPlotEntryRow } from './SubPlotEntryRow';
+import type { UserPlotResponse } from '@/modules/users/services/user-plot.service';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface BundlingFormModalProps {
   open: boolean;
   onClose: () => void;
   /** Called with one bundling (single mode) or an array (multi mode). */
   onSaved: (bundling: BundlingResponse | BundlingResponse[]) => void;
-  plots: PlotResponse[];
+  plots: UserPlotResponse[];
   users: UserResponse[];
   /** ID of the currently logged-in user — auto-filled as enfundador for non-admins. */
   userId?: string;
@@ -38,6 +44,9 @@ interface BundlingFormModalProps {
   cooperativeId?: string;
   bundling?: BundlingResponse;
 }
+
+const buildDefaultEnfundadorId = (isAdmin: boolean, userId?: string) =>
+  isAdmin ? '' : (userId ?? '');
 
 /** Modal for registering (single or multi-subplot) or editing a bundling operation. */
 export const BundlingFormModal = ({
@@ -60,8 +69,8 @@ export const BundlingFormModal = ({
   const isLoading = CreateBundling.loading || UpdateBundling.loading;
 
   const plotOptions: IOption[] = plots.map((p) => ({
-    value: p.id,
-    label: `${p.name} — ${(p.sector as { name: string }).name}`,
+    value: p.plot.id,
+    label: `${p.plot.name} — ${p.plot.sector.name}`,
   }));
   const userOptions: IOption[] = users.map((u) => ({ value: u.id, label: u.fullName }));
 
@@ -71,6 +80,7 @@ export const BundlingFormModal = ({
     control,
     reset,
     setValue,
+    getValues,
     formState: { isDirty, errors },
   } = useForm<CreateBundlingFormValues>({
     resolver: zodResolver(createBundlingSchema),
@@ -78,65 +88,25 @@ export const BundlingFormModal = ({
       bundledAt: todayIso(),
       plotId: '',
       subPlotId: undefined,
-      enfundadorUserId: '',
+      enfundadorUserId: buildDefaultEnfundadorId(isAdmin, userId),
       notes: '',
       subPlotEntries: [],
-      defaultEnfundadorUserId: '',
     },
   });
 
-  const { fields, replace } = useFieldArray({ control, name: 'subPlotEntries' });
+  const {
+    fields: subPlotFields,
+    replace: replaceSubPlotFields,
+  } = useFieldArray({ control, name: 'subPlotEntries' });
 
-  const selectedPlotId = useWatch({ control, name: 'plotId' });
-  const defaultEnfundadorUserId = useWatch({ control, name: 'defaultEnfundadorUserId' });
   const subPlotEntries = useWatch({ control, name: 'subPlotEntries' });
 
-  const selectedListPlot = plots.find((p) => p.id === selectedPlotId);
-  const hasSubPlots = (selectedListPlot?.subPlotsQuantity ?? 0) > 0;
-  const isMultiMode = hasSubPlots && !isEditing;
+  const isMultiMode = !isEditing && !!GetPlot.data?.subPlots?.length;
 
-  const subPlots = GetPlot.data?.subPlots ?? [];
   const includedCount = (subPlotEntries ?? []).filter((e) => e.included).length;
-
-  // ── Load subplots when plot changes ─────────────────────────────────────────
-
-  useEffect(() => {
-    if (!selectedPlotId || !hasSubPlots) return;
-    GetPlot.handler(selectedPlotId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPlotId]);
-
-  // ── Initialize rows when subplots load in multi mode ────────────────────────
-
-  useEffect(() => {
-    if (!isMultiMode || !subPlots.length) return;
-    const enfundadorId = isAdmin
-      ? (defaultEnfundadorUserId || userId || '')
-      : (userId || '');
-
-    replace(
-      subPlots.map((sp) => ({
-        subPlotId: sp.id,
-        included: true,
-        quantity: 0,
-        ribbonColorFree: RIBBON_COLORS[0],
-        notes: '',
-        localUuid: crypto.randomUUID(),
-        enfundadorUserId: enfundadorId,
-      })),
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subPlots]);
-
-  // ── Propagate defaultEnfundadorUserId to all rows ───────────────────────────
-
-  useEffect(() => {
-    if (!isAdmin || !defaultEnfundadorUserId || !fields.length) return;
-    fields.forEach((_, i) => {
-      setValue(`subPlotEntries.${i}.enfundadorUserId`, defaultEnfundadorUserId);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultEnfundadorUserId]);
+  const totalFundas = (subPlotEntries ?? [])
+    .filter((e) => e.included)
+    .reduce((sum, e) => sum + (e.quantity || 0), 0);
 
   // ── Reset on open ────────────────────────────────────────────────────────────
 
@@ -152,22 +122,52 @@ export const BundlingFormModal = ({
         ribbonColorFree: bundling.ribbonColorFree as RibbonColor,
         notes: bundling.notes ?? '',
         subPlotEntries: [],
-        defaultEnfundadorUserId: '',
       });
     } else {
       reset({
         bundledAt: todayIso(),
         plotId: '',
         subPlotId: undefined,
-        enfundadorUserId: isAdmin ? '' : (userId ?? ''),
+        enfundadorUserId: buildDefaultEnfundadorId(isAdmin, userId),
         notes: '',
         subPlotEntries: [],
-        defaultEnfundadorUserId: isAdmin ? (userId ?? '') : '',
       });
     }
   }, [open, bundling, userId, isAdmin, reset]);
 
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+
   const tryClose = () => (isDirty ? showConfirm.on() : onClose());
+
+  /** Propagates the selected enfundador to all subplot rows (multi mode). */
+  const handleEnfundadorChange = (enfundadorId: string) => {
+    setValue('enfundadorUserId', enfundadorId, { shouldDirty: true });
+    subPlotFields.forEach((_, i) => {
+      setValue(`subPlotEntries.${i}.enfundadorUserId`, enfundadorId);
+    });
+  };
+
+  /** Fetches plot detail and initialises subplot rows when a plot is selected. */
+  const handlePlotChange = async (newPlotId: string) => {
+    setValue('plotId', newPlotId, { shouldDirty: true, shouldValidate: true });
+    replaceSubPlotFields([]);
+    const plotData = await GetPlot.handler(newPlotId);
+    if (!plotData?.subPlots?.length) return;
+    const enfundadorId = getValues('enfundadorUserId') || userId || '';
+    replaceSubPlotFields(
+      plotData.subPlots.map((sp) => ({
+        included: true,
+        plotId: newPlotId,
+        subPlotId: sp.id,
+        enfundadorUserId: enfundadorId,
+        quantity: 0,
+        ribbonColorFree: RIBBON_COLORS[0],
+        localUuid: crypto.randomUUID(),
+        bundledAt: todayIso(),
+        notes: '',
+      })),
+    );
+  };
 
   // ── Submit ───────────────────────────────────────────────────────────────────
 
@@ -177,7 +177,7 @@ export const BundlingFormModal = ({
         bundling.id,
         {
           subPlotId: v.subPlotId ?? null,
-          quantity: v.quantity,
+          quantity: v.quantity ?? 0,
           bundledAt: v.bundledAt,
           ribbonColorFree: v.ribbonColorFree,
           notes: v.notes || null,
@@ -193,23 +193,25 @@ export const BundlingFormModal = ({
 
     if (isMultiMode && v.subPlotEntries?.length) {
       const includedEntries = v.subPlotEntries.filter((e) => e.included);
-      const result = await CreateBundling.handler({
-        cooperativeId,
-        plotId: v.plotId,
-        bundledAt: v.bundledAt,
-        subPlotEntries: includedEntries.map((e) => ({
-          subPlotId: e.subPlotId,
-          enfundadorUserId: e.enfundadorUserId,
-          quantity: e.quantity,
-          localUuid: e.localUuid,
-          ribbonColorFree: e.ribbonColorFree,
-          notes: e.notes || undefined,
-        })),
-      });
-      if (result) {
-        onSaved(result);
-        onClose();
+      if (includedEntries.length === 0) return;
+      const results: BundlingResponse[] = [];
+      for (const entry of includedEntries) {
+        const result = await CreateBundling.handler({
+          cooperativeId,
+          plotId: v.plotId,
+          bundledAt: v.bundledAt,
+          subPlotId: entry.subPlotId,
+          enfundadorUserId: entry.enfundadorUserId,
+          quantity: entry.quantity,
+          localUuid: entry.localUuid,
+          ribbonColorFree: entry.ribbonColorFree,
+          notes: entry.notes || undefined,
+        });
+        if (result === null) return;
+        results.push(result);
       }
+      onSaved(results);
+      onClose();
       return;
     }
 
@@ -219,7 +221,7 @@ export const BundlingFormModal = ({
       plotId: v.plotId,
       subPlotId: v.subPlotId,
       enfundadorUserId: v.enfundadorUserId ?? userId,
-      quantity: v.quantity,
+      quantity: v.quantity ?? 0,
       bundledAt: v.bundledAt,
       ribbonColorFree: v.ribbonColorFree,
       notes: v.notes || undefined,
@@ -231,14 +233,41 @@ export const BundlingFormModal = ({
     }
   };
 
-  // ── Primary button label ──────────────────────────────────────────────────────
+  // ── Submit button label ───────────────────────────────────────────────────────
 
   const submitLabel = (() => {
-    if (isLoading) return 'Guardando…';
     if (isEditing) return 'Guardar cambios';
-    if (isMultiMode) return includedCount > 0 ? `Guardar ${includedCount} enfunde${includedCount !== 1 ? 's' : ''}` : 'Selecciona subparcelas';
+    if (isMultiMode) {
+      return includedCount > 0
+        ? `Guardar ${includedCount} enfunde${includedCount !== 1 ? 's' : ''}`
+        : 'Selecciona subparcelas';
+    }
     return 'Registrar';
   })();
+
+  // ── Plot select (shared between modes) ──────────────────────────────────────
+
+  const renderPlotSelect = (
+    <Controller
+      name="plotId"
+      control={control}
+      render={() => (
+        <Select
+          label="Parcela"
+          required
+          isDisabled={isEditing}
+          error={errors.plotId?.message}
+          options={plotOptions}
+          value={plotOptions.find((o) => o.value === getValues('plotId')) ?? null}
+          onChange={(opt) => {
+            const newId = (opt as IOption | null)?.value ?? '';
+            if (newId) handlePlotChange(newId);
+          }}
+          placeholder="Seleccionar parcela..."
+        />
+      )}
+    />
+  );
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -250,220 +279,184 @@ export const BundlingFormModal = ({
         title={isEditing ? 'Editar enfunde' : 'Registrar enfunde'}
         maxWidth="md"
         footer={
-          <div className="flex w-full gap-3">
-            <button
+          <div className="flex w-full sm:w-auto justify-end gap-2 px-1 pb-1">
+            <Button
               type="button"
+              variant="outline"
               onClick={tryClose}
               disabled={isLoading}
-              className="flex-1 cursor-pointer rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-[transform,background-color] duration-160 ease-out hover:bg-gray-50 active:scale-[0.97] disabled:opacity-60"
+              className="flex-1 sm:flex-none h-11 sm:h-9 sm:px-4"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               form="bundling-form"
-              disabled={isLoading || (isMultiMode && includedCount === 0 && fields.length > 0)}
-              className="flex-1 cursor-pointer rounded-xl bg-[#27ae60] px-4 py-2 text-sm font-medium text-white transition-[transform,background-color] duration-160 ease-out hover:bg-[#219a52] active:scale-[0.97] disabled:opacity-60"
+              disabled={isLoading || (isMultiMode && includedCount === 0 && subPlotFields.length > 0)}
+              isLoading={isLoading}
+              className="flex-1 sm:flex-none h-11 sm:h-9 sm:px-4"
             >
               {submitLabel}
-            </button>
+            </Button>
           </div>
         }
       >
-        <form id="bundling-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* ── Plot select ────────────────────────────────────────────── */}
-          <Controller
-            name="plotId"
-            control={control}
-            render={({ field }) => (
-              <Select
-                label="Parcela"
+        <FormFieldset
+          id="bundling-form"
+          onSubmit={handleSubmit(onSubmit)}
+          disabled={isLoading}
+        >
+          {/* ── Plot + Fecha/Cantidad ─────────────────────────────────────── */}
+          {renderPlotSelect}
+          <div className={isMultiMode ? '' : 'grid grid-cols-2 gap-3'}>
+            <Input
+              label="Fecha"
+              required
+              type="date"
+              max={todayIso()}
+              error={errors.bundledAt?.message}
+              {...register('bundledAt')}
+            />
+            {!isMultiMode && (
+              <Input
+                label="Cantidad de fundas"
                 required
-                isDisabled={isEditing}
-                error={errors.plotId?.message}
-                options={plotOptions}
-                value={plotOptions.find((o) => o.value === field.value) ?? null}
-                onChange={(opt) => {
-                  const newId = (opt as IOption | null)?.value ?? '';
-                  if (newId !== field.value) replace([]);
-                  field.onChange(newId);
-                }}
-                placeholder="Seleccionar parcela..."
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={99999}
+                placeholder="0"
+                error={errors.quantity?.message}
+                {...register('quantity', { valueAsNumber: true })}
               />
             )}
-          />
+          </div>
 
-          {/* ── Date ──────────────────────────────────────────────────── */}
-          <Input
-            label="Fecha"
-            required
-            type="date"
-            max={todayIso()}
-            error={errors.bundledAt?.message}
-            {...register('bundledAt')}
-          />
-
-          {/* ── MULTI MODE: admin enfundador header + subplot rows ─────── */}
-          {isMultiMode && fields.length > 0 && (
-            <>
-              {isAdmin && (
-                <Controller
-                  name="defaultEnfundadorUserId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      label="Enfundador"
-                      required
-                      error={errors.defaultEnfundadorUserId?.message}
-                      options={userOptions}
-                      value={userOptions.find((o) => o.value === field.value) ?? null}
-                      onChange={(opt) => field.onChange((opt as IOption | null)?.value ?? '')}
-                      placeholder="Seleccionar enfundador..."
-                    />
-                  )}
-                />
-              )}
-
-              <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Subparcelas de &ldquo;{selectedListPlot?.name}&rdquo;
-                </p>
-                <div className="space-y-2">
-                  {fields.map((field, i) => {
-                    const sp = subPlots.find((s) => s.id === field.subPlotId);
-                    if (!sp) return null;
-                    return (
-                      <SubPlotEntryRow
-                        key={field.id}
-                        index={i}
-                        subPlot={sp}
-                        control={control}
-                        register={register}
-                        errors={errors}
-                        isLoading={isLoading}
-                      />
-                    );
-                  })}
-                </div>
-                {errors.subPlotEntries && !Array.isArray(errors.subPlotEntries) && (
-                  <p className="mt-1 text-xs text-red-500">
-                    {(errors.subPlotEntries as { message?: string }).message}
-                  </p>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* ── SINGLE MODE fields ────────────────────────────────────── */}
-          {!isMultiMode && (
-            <>
-              {hasSubPlots && (
-                <Controller
-                  name="subPlotId"
-                  control={control}
-                  render={({ field }) => {
-                    const subPlotOptions: IOption[] = subPlots.map((sp) => ({
-                      value: sp.id,
-                      label: sp.name,
-                    }));
-                    return (
-                      <Select
-                        label="Subparcela"
-                        required
-                        error={(errors.subPlotId as { message?: string } | undefined)?.message}
-                        options={subPlotOptions}
-                        value={subPlotOptions.find((o) => o.value === field.value) ?? null}
-                        onChange={(opt) =>
-                          field.onChange((opt as IOption | null)?.value ?? undefined)
-                        }
-                        placeholder="Seleccionar subparcela..."
-                      />
-                    );
-                  }}
-                />
-              )}
-
-              {(isAdmin || isEditing) && !!users.length && (
-                <Controller
-                  name="enfundadorUserId"
-                  control={control}
-                  render={({ field }) => (
-                    <Select
-                      label="Enfundador"
-                      required
-                      isDisabled={isEditing}
-                      error={errors.enfundadorUserId?.message}
-                      options={userOptions}
-                      value={userOptions.find((o) => o.value === field.value) ?? null}
-                      onChange={(opt) => field.onChange((opt as IOption | null)?.value ?? '')}
-                      placeholder="Seleccionar enfundador..."
-                    />
-                  )}
-                />
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  label="Cantidad de fundas"
+          {/* ── Enfundador: admin only, aplica a todas las filas en multi ── */}
+          {isAdmin && !!users.length && (
+            <Controller
+              name="enfundadorUserId"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label="Enfundador"
                   required
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={99999}
-                  placeholder="0"
-                  error={errors.quantity?.message}
-                  {...register('quantity', { valueAsNumber: true })}
+                  isDisabled={isEditing}
+                  error={errors.enfundadorUserId?.message}
+                  options={userOptions}
+                  value={userOptions.find((o) => o.value === field.value) ?? null}
+                  onChange={(opt) => handleEnfundadorChange((opt as IOption | null)?.value ?? '')}
+                  placeholder="Seleccionar enfundador..."
                 />
-              </div>
-
-              {/* Color picker */}
-              <div>
-                <label className="mb-2 block text-xs font-medium text-gray-700">
-                  Color de cinta <span className="text-red-500">*</span>
-                </label>
-                <div className="grid grid-cols-5 gap-2">
-                  {RIBBON_COLORS.map((color) => (
-                    <label key={color} className="cursor-pointer">
-                      <input
-                        type="radio"
-                        value={color}
-                        {...register('ribbonColorFree')}
-                        className="peer sr-only"
-                      />
-                      <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-transparent p-2 transition-colors peer-checked:border-[#27ae60] peer-checked:bg-[#27ae60]/5">
-                        <span
-                          className="h-6 w-6 rounded-full border border-black/10 shadow-sm"
-                          style={{ backgroundColor: RIBBON_COLOR_HEX[color as RibbonColor] }}
-                        />
-                        <span className="text-center text-[10px] font-medium text-gray-600">
-                          {RIBBON_COLOR_LABELS[color as RibbonColor]}
-                        </span>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                {errors.ribbonColorFree && (
-                  <p className="mt-1 text-xs text-red-500">{errors.ribbonColorFree.message}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-gray-700">
-                  Observaciones <span className="text-gray-400">(opcional)</span>
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Ej. Mal clima, producción reducida…"
-                  {...register('notes')}
-                  className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-[#27ae60] focus:ring-2 focus:ring-[#27ae60]/20"
-                />
-                {errors.notes && (
-                  <p className="mt-1 text-xs text-red-500">{errors.notes.message}</p>
-                )}
-              </div>
-            </>
+              )}
+            />
           )}
-        </form>
+
+          {/* ── Multi mode: subplot rows ──────────────────────────────────── */}
+          {isMultiMode && (
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                 Detalles
+                </p>
+                {subPlotFields.length > 0 && (
+                  <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <Badge variant='outline' className='text-sm h-6'>
+                      <ListChecks className="h-3.5 w-3.5 text-[#27ae60]" />
+                      {includedCount} lote{includedCount !== 1 ? 's' : ''}
+                    </Badge>
+                    <Badge variant='outline' className='text-sm h-6'>
+                      <Package2 className="h-3.5 w-3.5 text-[#27ae60]" />
+                      {totalFundas.toLocaleString()} fundas
+                    </Badge>
+                  </div>
+                )}
+              </div>
+              {!GetPlot.loading && includedCount === 0 && subPlotFields.length > 0 && (
+                <Alert className="max-w-md mb-2" variant='warning'>
+                <TriangleAlert />
+                  <AlertTitle> Debe seleccionar al menos un sub lote</AlertTitle>
+              </Alert>
+              )}
+              <div className="space-y-2">
+                {subPlotFields.map((field, i) => {
+                  const subPlot = GetPlot.data?.subPlots?.find((s) => s.id === field.subPlotId);
+                  if (!subPlot) return null;
+                  return (
+                    <SubPlotEntryRow
+                      key={field.id}
+                      index={i}
+                      subPlot={subPlot}
+                      control={control}
+                      register={register}
+                      errors={errors}
+                      isLoading={isLoading}
+                    />
+                  );
+                })}
+              </div>
+              {errors.subPlotEntries && !Array.isArray(errors.subPlotEntries) && (
+                <p className="mt-1 text-xs text-red-500">
+                  {(errors.subPlotEntries as { message?: string }).message}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ── Single mode: ribbon color + notes ────────────────────────── */}
+          {GetPlot.loading ?
+            <Skeleton className='aspect-video' /> :
+            <>
+              {!isMultiMode && (
+                <>
+                  <div>
+                    <label className="mb-2 block text-xs font-medium text-gray-700">
+                      Color de cinta <span className="text-red-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-5 gap-2">
+                      {RIBBON_COLORS.map((color) => (
+                        <label key={color} className="cursor-pointer">
+                          <input
+                            type="radio"
+                            value={color}
+                            {...register('ribbonColorFree')}
+                            className="peer sr-only"
+                          />
+                          <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-transparent p-2 transition-colors peer-checked:border-[#27ae60] peer-checked:bg-[#27ae60]/5">
+                            <span
+                              className="h-6 w-6 rounded-full border border-black/10 shadow-sm"
+                              style={{ backgroundColor: RIBBON_COLOR_HEX[color as RibbonColor] }}
+                            />
+                            <span className="text-center text-[10px] font-medium text-gray-600">
+                              {RIBBON_COLOR_LABELS[color as RibbonColor]}
+                            </span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    {errors.ribbonColorFree && (
+                      <p className="mt-1 text-xs text-red-500">{errors.ribbonColorFree.message}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-700">
+                      Observaciones <span className="text-gray-400">(opcional)</span>
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Ej. Mal clima, producción reducida…"
+                      {...register('notes')}
+                      className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors placeholder:text-gray-400 focus:border-[#27ae60] focus:ring-2 focus:ring-[#27ae60]/20"
+                    />
+                    {errors.notes && (
+                      <p className="mt-1 text-xs text-red-500">{errors.notes.message}</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </>
+          }
+        </FormFieldset>
       </Modal>
 
       {showConfirm.active && (
