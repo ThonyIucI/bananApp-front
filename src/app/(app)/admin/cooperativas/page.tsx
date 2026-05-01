@@ -364,7 +364,7 @@ const CooperativesPage = () => {
       title: `¿Eliminar "${c.name}"?`,
       description: 'Esta acción no se puede deshacer.',
       confirmLabel: 'Eliminar',
-      variant: 'danger',
+      variant: 'destructive',
     });
     if (!ok) return;
     await deleteCoop(c.id);

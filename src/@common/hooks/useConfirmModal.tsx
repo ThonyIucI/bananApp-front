@@ -20,7 +20,7 @@ const CLOSED: DialogState = { open: false, title: '' };
 
 /**
  * Promise-based confirm dialog.
- * Usage: `const ok = await confirm({ title, description, variant: 'danger' })`.
+ * Usage: `const ok = await confirm({ title, description, variant: 'destructive' })`.
  * Render `{dialog}` in JSX to mount the portal.
  */
 export const useConfirmModal = () => {
