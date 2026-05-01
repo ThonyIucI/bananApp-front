@@ -19,6 +19,7 @@ import type { CooperativeResponse } from '@/modules/cooperatives/services/cooper
 import { roleOptions } from '../../constants';
 import { Button } from '@/components/ui/button';
 import { CheckBoxInput } from '@/@common/components/form/CheckBoxInput';
+import { useAuthContext } from '@/modules/auth/context/auth.context';
 
 interface UserFormValues {
   firstName: string;
@@ -49,6 +50,7 @@ export const UserFormModal = ({ open, onClose, onSaved, user, cooperatives }: Us
   const CreateUser = useCreateUser();
   const UpdateUser = useUpdateUser();
   const AssignCoop = useAssignUserCooperative();
+  const { isSuperadmin  } = useAuthContext();
   const loading = isEdit ? UpdateUser.loading : (CreateUser.loading || AssignCoop.loading);
 
   const coopOptions: IOption[] = cooperatives.map((c) => ({ value: c.id, label: c.name }));
@@ -96,6 +98,7 @@ export const UserFormModal = ({ open, onClose, onSaved, user, cooperatives }: Us
         email: v.email.trim(),
         dni: v.dni.trim() || undefined,
         isActive: v.isActive,
+        password: isSuperadmin ? v.password : undefined,
         mustChangePassword: v.mustChangePassword,
       });
       if (result) { onSaved(result); onClose(); }
@@ -174,14 +177,14 @@ export const UserFormModal = ({ open, onClose, onSaved, user, cooperatives }: Us
             error={errors.email?.message}
             {...register('email', { required: 'Campo requerido', pattern: { value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/, message: 'Correo inválido' } })}
           />
-          {!isEdit && (
+          {(isSuperadmin || !isEdit) && (
             <Input
               label="Contraseña"
               required
               type="password"
               placeholder="Mínimo 8 caracteres"
               error={errors.password?.message}
-              {...register('password', { required: 'Campo requerido', minLength: { value: 8, message: 'Mínimo 8 caracteres' }, maxLength: 100 })}
+              {...register('password', { required: isEdit ? undefined : 'Campo requerido', minLength: { value: 8, message: 'Mínimo 8 caracteres' }, maxLength: 100 })}
             />
           )}
           <Input
@@ -212,7 +215,6 @@ export const UserFormModal = ({ open, onClose, onSaved, user, cooperatives }: Us
             <Controller
               name="mustChangePassword"
               control={control}
-              rules={{ required: 'Campo requerido' }}
               render={({ field }) => (
                 <CheckBoxInput
                   checked={field.value}

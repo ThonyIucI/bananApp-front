@@ -1,8 +1,8 @@
 export interface IOption {
-    value: string | number
+    value: string
     label: string
     options?: {
-        value: string | number
+        value: string
         label: string
     }[]
 }

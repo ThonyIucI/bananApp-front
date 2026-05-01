@@ -3,21 +3,28 @@
 import useRequest from '@/@common/hooks/useRequest';
 import { enqueueBundling } from '@/lib/offline/sync-manager';
 import { toast } from 'react-toastify';
+import { ApiError } from '@/lib/api/client';
 import {
   createBundlingRequest,
+  isBundlingArray,
   type CreateBundlingPayload,
   type BundlingResponse,
+  type SubPlotEntryPayload,
 } from '../services/bundling.service';
 import { todayIso } from '@/@common/utils/date';
 
 /**
- * Creates a bundling record.
+ * Creates one or multiple bundling records.
  *
- * When online: calls the API directly and stores the result in the sync queue
- * as 'synced' (for offline history display).
+ * Single mode (no subPlotEntries):
+ *   - Online → POST → BundlingResponse
+ *   - Offline → enqueue 1 item → synthetic BundlingResponse
  *
- * When offline (or on network failure): enqueues the payload as 'pending'
- * and shows a tactile + visual confirmation to the user.
+ * Multi mode (subPlotEntries present):
+ *   - Online → 1 POST with array → BundlingResponse[]
+ *   - Offline → enqueue N items (one per entry) → synthetic BundlingResponse[]
+ *
+ * Network errors while online are treated as offline (item(s) enqueued).
  */
 export function useCreateBundling() {
   const { loading, handler } = useRequest(
@@ -34,28 +41,47 @@ export function useCreateBundling() {
     },
   );
 
-  return { loading, handler };
-}
+return { loading, handler };
+};
 
-/** Builds a synthetic BundlingResponse from an offline payload for optimistic UI. */
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Reconstructs a single-mode payload from a multi-mode entry. */
+const buildEntryPayload = (
+  base: CreateBundlingPayload,
+  entry: SubPlotEntryPayload,
+): CreateBundlingPayload => ({
+  cooperativeId: base.cooperativeId,
+  plotId: base.plotId,
+  bundledAt: base.bundledAt,
+  subPlotId: entry.subPlotId,
+  enfundadorUserId: entry.enfundadorUserId,
+  quantity: entry.quantity,
+  localUuid: entry.localUuid,
+  ribbonColorFree: entry.ribbonColorFree,
+  ribbonCalendarId: entry.ribbonCalendarId,
+  notes: entry.notes,
+});
+
+/** Builds a synthetic BundlingResponse from a single-mode payload for optimistic UI. */
 const buildOfflineResponse = (payload: CreateBundlingPayload): BundlingResponse => ({
-  id: payload.localUuid,
-  quantity: payload.quantity,
+  id: payload.localUuid ?? '',
+  quantity: payload.quantity ?? 0,
   bundledAt: payload.bundledAt,
   ribbonColorFree: payload.ribbonColorFree ?? null,
   ribbonCalendar: null,
   notes: payload.notes ?? null,
-  localUuid: payload.localUuid,
+  localUuid: payload.localUuid ?? '',
   syncedAt: null,
   createdAt: todayIso(),
   plot: { id: payload.plotId, name: '' },
   subPlot: null,
-  enfundadorUser: { id: payload.enfundadorUserId, fullName: '' },
+  enfundadorUser: { id: payload.enfundadorUserId ?? '', fullName: '' },
 });
 
 const createOfflineBundling = async (payload: CreateBundlingPayload): Promise<void> => {
   await enqueueBundling({
-    localUuid: payload.localUuid,
+    localUuid: payload.localUuid??'',
     payload,
     status: 'pending',
     attempts: 0,
@@ -67,6 +93,6 @@ const createOfflineBundling = async (payload: CreateBundlingPayload): Promise<vo
 
 const createOnlineBundling = async (payload: CreateBundlingPayload): Promise<BundlingResponse> => {
   const result = await createBundlingRequest(payload);
-  toast.success(`${result.quantity} fundas contabilizadas`, { autoClose: 5000 });
-  return result;
+  toast.success(`${result?.data?.quantity ?? 0} fundas contabilizadas`, { autoClose: 5000 });
+  return result.data;
 };

@@ -1,5 +1,6 @@
-import { getDb, purgeSyncedBundlings, type QueuedBundling } from './db';
+import { getDb, purgeSyncedBundlings, type QueuedBundling, type ErrorKind } from './db';
 import { createBundlingRequest } from '@/modules/bundlings/services/bundling.service';
+import { ApiError } from '@/lib/api/client';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -18,18 +19,16 @@ export interface SyncState {
 
 // ─── Broadcast helpers ────────────────────────────────────────────────────────
 
-/** Broadcast current sync state to all tabs via BroadcastChannel. */
 const broadcast = (state: SyncState) => {
   try {
     const ch = new BroadcastChannel(SYNC_CHANNEL);
     ch.postMessage(state);
     ch.close();
   } catch {
-    // BroadcastChannel unavailable in some older environments — ignore silently
+    // BroadcastChannel unavailable in some older environments
   }
 };
 
-/** Subscribe to SyncState updates from other tabs. Returns unsubscribe fn. */
 export const subscribeSyncState = (cb: (state: SyncState) => void): (() => void) => {
   let ch: BroadcastChannel;
   try {
@@ -57,40 +56,76 @@ const buildState = async (): Promise<SyncState> => {
 
 const broadcastState = async () => broadcast(await buildState());
 
-// ─── Core ops ─────────────────────────────────────────────────────────────────
+// ─── Error classification ─────────────────────────────────────────────────────
 
 /**
- * Enqueue a bundling for offline storage.
- * Stores it with status='pending' so syncPending() picks it up.
+ * Classifies a caught error to decide retry strategy.
+ * - backend  : server returned 4xx/5xx — terminal, no retry
+ * - network  : no connectivity or request never reached server — retry with backoff
+ * - unknown  : anything else — retry acotado
  */
+const classifyError = (err: unknown): ErrorKind => {
+  if (err instanceof ApiError && err.status >= 400) return 'backend';
+  if (
+    !navigator.onLine ||
+    (err instanceof Error &&
+      (err.message.includes('Failed to fetch') ||
+        err.message.includes('Network Error') ||
+        err.message.includes('ERR_NETWORK') ||
+        err.name === 'NetworkError'))
+  ) {
+    return 'network';
+  }
+  return 'unknown';
+};
+
+// ─── Core ops ─────────────────────────────────────────────────────────────────
+
+/** Enqueue a bundling for offline storage. */
 export const enqueueBundling = async (item: QueuedBundling): Promise<void> => {
   const db = await getDb();
   await db.put('bundlingsQueue', item);
   await broadcastState();
 };
 
-/**
- * Read all queued bundlings (pending + failed) for offline display.
- * Includes synced items so the user sees today's registrations.
- */
+/** Read all queued bundlings (all statuses) for offline display. Most recent first. */
 export const getQueuedBundlings = async (): Promise<QueuedBundling[]> => {
   const db = await getDb();
   const all = await db.getAll('bundlingsQueue');
-  // Most recent first
   return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 };
 
 /** Read current sync state without broadcasting. */
 export const getSyncState = buildState;
 
+/**
+ * Reset a failed/pending item so it will be retried on the next sync cycle.
+ * If online, triggers an immediate sync.
+ */
+export const retryItem = async (localUuid: string): Promise<void> => {
+  const db = await getDb();
+  const item = await db.get('bundlingsQueue', localUuid);
+  if (!item) return;
+  await db.put('bundlingsQueue', {
+    ...item,
+    status: 'pending',
+    attempts: 0,
+    errorKind: undefined,
+    lastError: undefined,
+  });
+  await broadcastState();
+  if (navigator.onLine) syncPending();
+};
+
+/** Permanently remove a queued item from IndexedDB without sending it to the server. */
+export const removeItem = async (localUuid: string): Promise<void> => {
+  const db = await getDb();
+  await db.delete('bundlingsQueue', localUuid);
+  await broadcastState();
+};
+
 // ─── Sync loop ────────────────────────────────────────────────────────────────
 
-/**
- * Attempt to sync all pending/failed bundlings.
- * - Processes in batches of BATCH_SIZE
- * - Applies exponential backoff per item based on attempts
- * - Items exceeding MAX_ATTEMPTS are marked 'failed' permanently (until manually retried)
- */
 export const syncPending = async (): Promise<void> => {
   if (_isSyncing || !navigator.onLine) return;
 
@@ -111,32 +146,38 @@ export const syncPending = async (): Promise<void> => {
   for (const item of batch) {
     if (!navigator.onLine) break;
 
-    // Respect exponential backoff — skip if not enough time has passed
+    // Backend errors are terminal — skip without retrying
+    if (item.errorKind === 'backend') continue;
+
+    // Respect exponential backoff for network/unknown errors
     if (item.attempts > 0 && item.lastError) {
       const delay = BACKOFF_DELAYS_MS[Math.min(item.attempts - 1, BACKOFF_DELAYS_MS.length - 1)];
       const lastAttemptAt = item.syncedAt ?? item.createdAt;
       if (Date.now() - new Date(lastAttemptAt).getTime() < delay) continue;
     }
 
-    // Mark as syncing
     await db.put('bundlingsQueue', { ...item, status: 'syncing' });
 
     try {
       await createBundlingRequest(item.payload);
-      // Backend is idempotent via localUuid — safe to retry
       await db.put('bundlingsQueue', {
         ...item,
         status: 'synced',
         syncedAt: new Date().toISOString(),
         lastError: undefined,
+        errorKind: undefined,
       });
     } catch (err) {
+      const kind = classifyError(err);
       const errorMsg = err instanceof Error ? err.message : 'Error de sincronización';
       const nextAttempts = item.attempts + 1;
+
       await db.put('bundlingsQueue', {
         ...item,
-        status: nextAttempts >= MAX_ATTEMPTS ? 'failed' : 'pending',
+        // Backend errors are immediately terminal; network/unknown use backoff
+        status: kind === 'backend' || nextAttempts >= MAX_ATTEMPTS ? 'failed' : 'pending',
         attempts: nextAttempts,
+        errorKind: kind,
         lastError: errorMsg,
         syncedAt: new Date().toISOString(),
       });
@@ -154,14 +195,8 @@ export const syncPending = async (): Promise<void> => {
 
 let _intervalId: ReturnType<typeof setInterval> | null = null;
 
-/**
- * Initialize auto-sync listeners. Safe to call multiple times — idempotent.
- * - Syncs on "online" event
- * - Syncs every 30s while the tab is visible
- */
 export const initAutoSync = (): (() => void) => {
   const onOnline = () => syncPending();
-
   const onVisibilityChange = () => {
     if (document.visibilityState === 'visible') syncPending();
   };
@@ -169,7 +204,6 @@ export const initAutoSync = (): (() => void) => {
   window.addEventListener('online', onOnline);
   document.addEventListener('visibilitychange', onVisibilityChange);
 
-  // Start interval only when tab is visible
   if (_intervalId === null) {
     _intervalId = setInterval(() => {
       if (document.visibilityState === 'visible') syncPending();

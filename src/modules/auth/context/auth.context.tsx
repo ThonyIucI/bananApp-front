@@ -36,7 +36,7 @@ type Action =
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'INIT':
-      return { ...state, user: action.user, accessToken: action.accessToken, isInitialized: true };
+      return { ...state, user: action.user, isSuperadmin: action.user?.isSuperadmin||false, accessToken: action.accessToken, isInitialized: true };
     case 'SET_SESSION':
       return { user: action.user, accessToken: action.accessToken, isSuperadmin: action.user?.isSuperadmin, sessionExpired: false, isInitialized: true };
     case 'CLEAR_SESSION':

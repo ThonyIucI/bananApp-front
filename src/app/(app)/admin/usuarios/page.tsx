@@ -87,7 +87,7 @@ const UsersPage = () => {
       title: `¿Eliminar a "${u.fullName}"?`,
       description: 'Esta acción no se puede deshacer.',
       confirmLabel: 'Eliminar',
-      variant: 'danger',
+      variant: 'destructive',
     });
     if (!ok) return;
     await DeleteUser.handler(u.id);

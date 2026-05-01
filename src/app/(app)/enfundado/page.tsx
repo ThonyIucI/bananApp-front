@@ -9,14 +9,17 @@ import { useListBundlings } from '@/modules/bundlings/hooks/useListBundlings';
 import { useListPlots } from '@/modules/plots/hooks/useListPlots';
 import { useListUsers } from '@/modules/users/hooks/useListUsers';
 import { useDeleteBundling } from '@/modules/bundlings/hooks/useDeleteBundling';
+import type { UserPlotResponse } from '@/modules/users/services/user-plot.service';
 import { BundlingFormModal } from '@/modules/bundlings/components/BundlingFormModal';
 import { RowActions } from '@/@common/components/RowActions';
 import { RIBBON_COLOR_HEX, RIBBON_COLOR_LABELS } from '@/@common/constants/ribbon-colors';
 import type { RibbonColor } from '@/@common/constants/ribbon-colors';
 import { formatDate } from '@/@common/utils/date';
 import type { BundlingResponse } from '@/modules/bundlings/services/bundling.service';
+import { isBundlingArray } from '@/modules/bundlings/services/bundling.service';
 import { getQueuedBundlings } from '@/lib/offline/sync-manager';
 import type { QueuedBundling } from '@/lib/offline/db';
+import { useListUserPlots } from '@/modules/users/hooks/useListUserPlots';
 
 // ─── Pending badge ────────────────────────────────────────────────────────────
 
@@ -41,6 +44,7 @@ const EnfundadoPage = () => {
 
   const ListBundlings = useListBundlings();
   const ListPlots = useListPlots();
+  const ListUserPlots = useListUserPlots();
   const ListUsers = useListUsers();
   const DeleteBundling = useDeleteBundling();
   const showForm = useBoolean();
@@ -49,23 +53,32 @@ const EnfundadoPage = () => {
   const [editTarget, setEditTarget] = useState<BundlingResponse | undefined>();
   const [queuedItems, setQueuedItems] = useState<QueuedBundling[]>([]);
 
-  const plots = ListPlots.data?.items ?? [];
+  // Superadmin sees all plots; other roles see only their assigned plots.
+  // TODO: replace with indexdb lookup for offline support
+  const plots: UserPlotResponse[] = isSuperadmin
+    ? (ListPlots.data?.items ?? []).map((p) => ({
+        id: p.id,
+        assignedAt: '',
+        notes: null,
+        plot: { id: p.id, name: p.name, areaHectares: p.areaHectares, sector: { id: p.sector.id, name: p.sector.name } },
+      }))
+    : (ListUserPlots.data ?? []);
   const users = ListUsers.data?.items ?? [];
 
   // ── Load data ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!cooperativeId) return;
-    ListBundlings.handler({ cooperativeId, limit: 100 });
-    ListPlots.handler({ cooperativeId, limit: 100 });
+    if (!cooperativeId || !user) return;
+    ListBundlings.handler({ cooperativeId, enfundadorUserId: isSuperadmin ? undefined : user.id, limit: 100 });
+    if (isSuperadmin) {
+      ListUsers.handler();
+      // TODO: traer plots de indexdb en lugar de endpoint
+      ListPlots.handler({ cooperativeId, limit: 100 });
+    } else {
+      ListUserPlots.handler({ userId: user.id, cooperativeId });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cooperativeId]);
-
-  useEffect(() => {
-    if (!isSuperadmin) return;
-    ListUsers.handler();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuperadmin]);
 
   // Load queued items from IDB (pending + failed + recent synced)
   useEffect(() => {
@@ -95,9 +108,13 @@ const EnfundadoPage = () => {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleSaved = (b: BundlingResponse) => {
-    ListBundlings.onUpsert(b);
-    // Refresh queue so the new item shows "Pendiente" if it was offline
+  const handleSaved = (b: BundlingResponse | BundlingResponse[]) => {
+    if (isBundlingArray(b)) {
+      b.forEach((item) => ListBundlings.onUpsert(item));
+    } else {
+      ListBundlings.onUpsert(b);
+    }
+    // Refresh queue so new items show "Pendiente" if they were offline
     getQueuedBundlings()
       .then(setQueuedItems)
       .catch(() => {});
@@ -118,7 +135,7 @@ const EnfundadoPage = () => {
       title: '¿Eliminar enfunde?',
       description: `Se eliminarán ${b.quantity} fundas registradas en "${b.plot.name}". Esta acción no se puede deshacer.`,
       confirmLabel: 'Eliminar',
-      variant: 'danger',
+      variant: 'destructive',
     });
     if (!ok) return;
     await DeleteBundling.handler(b.id, cooperativeId);
@@ -137,7 +154,7 @@ const EnfundadoPage = () => {
       <div className="mx-auto max-w-4xl space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Enfundado</h1>
+            <h1 className="text-xl font-bold text-gray-900">Mis enfundes</h1>
             <p className="mt-0.5 text-sm text-gray-500">
               {totalCount} registro{totalCount !== 1 ? 's' : ''}
               {localPending.length > 0 && (
@@ -194,7 +211,7 @@ const EnfundadoPage = () => {
                       <span className="text-gray-400 text-xs italic">(parcela pendiente)</span>
                     </td>
                     <td className="px-5 py-3 text-gray-600">—</td>
-                    <td className="px-5 py-3 text-gray-900">{q.payload.quantity.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-gray-900">{(q.payload.quantity ?? 0).toLocaleString()}</td>
                     <td className="px-5 py-3">
                       {q.payload.ribbonColorFree ? (
                         <span className="flex items-center gap-1.5">
@@ -259,7 +276,7 @@ const EnfundadoPage = () => {
                   </div>
                   <div className="ml-3 flex items-center gap-2">
                     <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900">{q.payload.quantity.toLocaleString()} fundas</p>
+                      <p className="text-sm font-bold text-gray-900">{(q.payload.quantity ?? 0).toLocaleString()} fundas</p>
                     </div>
                     <PendingBadge status={q.status} />
                   </div>
@@ -320,6 +337,7 @@ const EnfundadoPage = () => {
           plots={plots}
           users={users}
           userId={user?.id}
+          isAdmin={isSuperadmin}
           cooperativeId={cooperativeId}
           bundling={editTarget}
         />

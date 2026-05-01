@@ -40,6 +40,7 @@ export interface PlotFilters {
   cooperativeId?: string;
   sectorId?: string;
   ownerUserId?: string;
+  workerUserId?: string;
   limit?: number;
   offset?: number;
 }

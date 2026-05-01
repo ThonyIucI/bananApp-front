@@ -36,9 +36,15 @@ export interface BundlingResponse {
   enfundadorUser: BundlingUserRef;
 }
 
+/** Type guard — true when createBundlingRequest returns an array (multi mode). */
+export const isBundlingArray = (
+  res: BundlingResponse | BundlingResponse[],
+): res is BundlingResponse[] => Array.isArray(res);
+
 export interface BundlingFilters {
   cooperativeId?: string;
   plotId?: string;
+  plotIds?: string[];
   subPlotId?: string;
   enfundadorUserId?: string;
   from?: string;
@@ -47,17 +53,30 @@ export interface BundlingFilters {
   offset?: number;
 }
 
-export interface CreateBundlingPayload {
-  cooperativeId?: string;
-  plotId: string;
-  subPlotId?: string;
+export interface SubPlotEntryPayload {
+  subPlotId: string;
   enfundadorUserId: string;
   quantity: number;
-  bundledAt: string;
   localUuid: string;
   ribbonColorFree?: string;
   ribbonCalendarId?: string;
   notes?: string;
+}
+
+export interface CreateBundlingPayload {
+  cooperativeId?: string;
+  plotId: string;
+  bundledAt: string;
+  // Single mode fields (omitted when subPlotEntries is provided):
+  subPlotId?: string;
+  enfundadorUserId?: string;
+  quantity?: number;
+  localUuid?: string;
+  ribbonColorFree?: string;
+  ribbonCalendarId?: string;
+  notes?: string;
+  // Multi mode:
+  subPlotEntries?: SubPlotEntryPayload[];
 }
 
 export interface UpdateBundlingPayload {
@@ -164,13 +183,13 @@ export const listBundlingsRequest = async (
   return res.data;
 };
 
-/** Creates a bundling record. */
-export const createBundlingRequest = async (
-  payload: CreateBundlingPayload,
-): Promise<BundlingResponse> => {
-  const res = await apiClient.post<BundlingResponse>('/bundlings', payload);
-  return res.data;
-};
+/**
+ * Creates one or multiple bundling records.
+ * - Without subPlotEntries → single mode → returns BundlingResponse
+ * - With subPlotEntries → multi mode → returns BundlingResponse[]
+ */
+export const createBundlingRequest = (payload: CreateBundlingPayload) => 
+  apiClient.post<BundlingResponse>('/bundlings', payload);
 
 /** Updates a bundling record. `cooperativeId` is sent as a query param for the guard. */
 export const updateBundlingRequest = async (

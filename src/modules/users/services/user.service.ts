@@ -65,6 +65,7 @@ export interface UpdateUserPayload {
   email?: string;
   dni?: string;
   isActive?: boolean;
+  password?: string;
   mustChangePassword?: boolean;
 }
 

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 
 export function LoginForm() {
   const { login, isPending } = useLogin();
+  // errors shown via toast — no serverError state needed
 
   const {
     register,
@@ -28,6 +29,7 @@ export function LoginForm() {
       suppressHydrationWarning
       style={{ touchAction: 'manipulation' }}
     >
+      {/* Email field */}
       <div className="flex flex-col gap-2">
         <label htmlFor="email" className="text-sm font-semibold text-slate-700">
           Correo electrónico
