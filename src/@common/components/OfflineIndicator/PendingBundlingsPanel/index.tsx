@@ -42,7 +42,7 @@ export const PendingBundlingsPanel = ({ items, onChanged }: PendingBundlingsPane
       title: '¿Eliminar enfunde pendiente?',
       description: 'Los datos de este registro se perderán permanentemente y no se enviarán al servidor.',
       confirmLabel: 'Eliminar',
-      variant: 'danger',
+      variant: 'destructive',
     });
     if (!ok) return;
     await removeItem(item.localUuid);

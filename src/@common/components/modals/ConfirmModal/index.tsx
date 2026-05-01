@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from "@/components/ui/button";
+
 interface ConfirmModalProps {
   open: boolean;
   onConfirm: () => void;
@@ -8,15 +10,9 @@ interface ConfirmModalProps {
   description?: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  variant?: 'danger' | 'default';
+  variant?: 'destructive' | 'default';
 }
 
-const CONFIRM_CLASS: Record<NonNullable<ConfirmModalProps['variant']>, string> = {
-  danger:
-    'cursor-pointer rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white transition-[transform,background-color] duration-[160ms] ease-out hover:bg-red-600 active:scale-[0.97]',
-  default:
-    'cursor-pointer rounded-xl bg-[#27ae60] px-4 py-2 text-sm font-medium text-white transition-[transform,background-color] duration-[160ms] ease-out hover:bg-[#219a52] active:scale-[0.97]',
-};
 
 /** Generic styled confirmation dialog. Always use this — never window.confirm(). */
 export const ConfirmModal = ({
@@ -43,16 +39,12 @@ export const ConfirmModal = ({
         <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
         {description && <p className="mt-1.5 text-sm text-gray-500">{description}</p>}
         <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="cursor-pointer rounded-xl border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition-[transform,background-color] duration-160 ease-out hover:bg-gray-50 active:scale-[0.97]"
-          >
+          <Button onClick={onCancel} variant='outline'>
             {cancelLabel}
-          </button>
-          <button type="button" onClick={onConfirm} className={CONFIRM_CLASS[variant]}>
+          </Button>
+          <Button onClick={onConfirm} variant={variant}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

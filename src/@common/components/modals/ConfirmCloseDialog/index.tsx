@@ -15,7 +15,7 @@ export const ConfirmCloseDialog = ({ onConfirm, onCancel }: ConfirmCloseDialogPr
     description="Tienes cambios sin guardar. Si cierras, se perderán."
     confirmLabel="Descartar"
     cancelLabel="Seguir editando"
-    variant="danger"
+    variant="destructive"
     onConfirm={onConfirm}
     onCancel={onCancel}
   />

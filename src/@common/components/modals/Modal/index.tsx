@@ -41,7 +41,7 @@ export const Modal = ({ open, onClose, title, children, footer, maxWidth = 'md' 
           <div className="h-1 w-10 rounded-full bg-gray-300" />
         </div>
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
           <button
             type="button"
             onClick={onClose}
