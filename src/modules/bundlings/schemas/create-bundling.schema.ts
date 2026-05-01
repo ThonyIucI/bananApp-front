@@ -13,8 +13,8 @@ export const subPlotEntryRowSchema = z.object({
   quantity: z
     .number({ error: 'Debe ser un número' })
     .int('Debe ser un número entero')
-    .min(1, 'Mínimo 1 funda')
-    .max(99999, 'Máximo 99 999 fundas'),
+    .min(1, 'Mínimo 1')
+    .max(99999, 'Máximo 99 999'),
   ribbonColorFree: z.enum(RIBBON_COLORS, { message: 'Selecciona un color' }),
   notes: z.string().max(500, 'Máximo 500 caracteres').optional(),
   localUuid: z.string().uuid(),
@@ -37,14 +37,14 @@ export const createBundlingSchema = z
     quantity: z
       .number({ error: 'Debe ser un número' })
       .int('Debe ser un número entero')
-      .min(1, 'Mínimo 1 funda')
-      .max(99999, 'Máximo 99 999 fundas')
-      .optional(),
+      .min(1, 'Mínimo 1')
+      .max(99999, 'Máximo 99 999')
+      .optional()
+      .nullable(),
     ribbonColorFree: z.enum(RIBBON_COLORS, { message: 'Selecciona un color de cinta' }).optional(),
     notes: z.string().max(500, 'Máximo 500 caracteres').optional(),
     // Multi mode:
     subPlotEntries: z.array(subPlotEntryRowSchema).optional(),
-    defaultEnfundadorUserId: z.string().uuid().optional(),
   })
   .superRefine((v, ctx) => {
     const isMulti = (v.subPlotEntries?.length ?? 0) > 0;
@@ -68,7 +68,7 @@ export const createBundlingSchema = z
       if (!v.quantity || v.quantity < 1) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Mínimo 1 funda',
+          message: 'Mínimo 1',
           path: ['quantity'],
         });
       }

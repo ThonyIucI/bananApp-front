@@ -121,7 +121,7 @@ export const AssignPlotsModal = ({
       return;
     }
 
-    await Promise.all([
+    const [assignResult, unassignResult] = await Promise.all([
       toAssign.length > 0
         ? AssignPlots.handler(user.id, { cooperativeId, plotIds: toAssign })
         : Promise.resolve(null),
@@ -130,9 +130,14 @@ export const AssignPlotsModal = ({
         : Promise.resolve(null),
     ]);
 
-    toast.success('Asignaciones de parcelas actualizadas');
-    onAssigned([...selectedIds]);
-    onClose();
+    const assignOk = toAssign.length === 0 || assignResult !== null;
+    const unassignOk = toUnassign.length === 0 || unassignResult !== null;
+
+    if (assignOk && unassignOk) {
+      toast.success('Asignaciones de parcelas actualizadas');
+      onAssigned([...selectedIds]);
+      onClose();
+    }
   };
 
   const selectedCount = selectedIds.size;

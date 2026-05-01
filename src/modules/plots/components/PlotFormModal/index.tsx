@@ -17,6 +17,7 @@ import type { SectorResponse } from '@/modules/sectors/services/sector.service';
 import type { UserResponse } from '@/modules/users/services/user.service';
 import type { PlotResponse } from '../../services/plot.service';
 import { PLOT_FORM_DEFAULT_VALUES, PlotFormValues } from './constants';
+import { FormFieldset } from '@/@common/components/form/FormFieldset';
 
 interface PlotFormModalProps {
   open: boolean;
@@ -118,10 +119,10 @@ export const PlotFormModal = ({
     const result = isEdit
       ? await updatePlot(plot!.id, commonData)
       : await createPlot({
-          ...commonData,
-          workerUserId: commonData.workerUserId ?? undefined,
-          cadastralCode: commonData.cadastralCode ?? undefined,
-        });
+        ...commonData,
+        workerUserId: commonData.workerUserId ?? undefined,
+        cadastralCode: commonData.cadastralCode ?? undefined,
+      });
 
     if (result) {
       onSaved(result);
@@ -148,7 +149,7 @@ export const PlotFormModal = ({
             type="submit"
             form="plot-form"
             disabled={isSaving || fetching}
-            isLoading={isSaving || fetching}
+            isLoading={isSaving}
             className="flex-1 sm:flex-none h-11 sm:h-9 sm:px-4"
           >
             {isEdit ? 'Guardar cambios' : 'Crear parcela'}
@@ -156,154 +157,156 @@ export const PlotFormModal = ({
         </div>
       }
     >
-      {fetching ? (
-        <div className="flex h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-        </div>
-      ) : (
-        <form id="plot-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <Input
-            label="Nombre de la parcela"
-            required
-            autoFocus
-            error={errors.name?.message}
-            {...register('name', { required: 'Campo requerido', minLength: 2 })}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Controller
-              name="sectorId"
-              control={control}
-              rules={{ required: 'Selecciona un sector' }}
-              render={({ field }) => (
-                <Select
-                  label="Sector"
-                  error={errors.sectorId?.message}
-                  options={sectorOptions}
-                  value={sectorOptions.find((o) => o.value === field.value)}
-                  onChange={(opt) => field.onChange((opt as IOption)?.value)}
-                  menuPortalTarget={document.getElementById("overlays")}
-                />
-              )}
-            />
-
-            <Controller
-              name="ownerUserId"
-              control={control}
-              rules={{ required: 'Selecciona un propietario' }}
-              render={({ field }) => (
-                <Select
-                  label="Propietario"
-                  required
-                  error={errors.ownerUserId?.message}
-                  options={userOptions}
-                  value={userOptions.find((o) => o.value === field.value)}
-                  onChange={(opt) => field.onChange((opt as IOption)?.value)}
-                />
-              )}
-            />
-          </div>
-
+      <FormFieldset
+        id="plot-form"
+        onSubmit={handleSubmit(onSubmit)}
+        isLoading={fetching}
+        disabled={isSaving}
+      >
+        <Input
+          label="Nombre de la parcela"
+          placeholder='Ingrese el nombre'
+          required
+          autoFocus
+          error={errors.name?.message}
+          {...register('name', { required: 'Campo requerido', minLength: 2 })}
+        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Controller
-            name="workerUserId"
+            name="sectorId"
             control={control}
+            rules={{ required: 'Selecciona un sector' }}
             render={({ field }) => (
               <Select
-                label="Arrendatario"
-                isClearable
-                options={userOptions}
-                value={userOptions.find((o) => o.value === field.value)}
-                onChange={(opt) => field.onChange((opt as IOption)?.value ?? '')}
-                placeholder="Sin asignar (opcional)"
+                label="Sector"
+                isDisabled={isSaving}
+                error={errors.sectorId?.message}
+                options={sectorOptions}
+                value={sectorOptions.find((o) => o.value === field.value)}
+                onChange={(opt) => field.onChange((opt as IOption)?.value)}
+                menuPortalTarget={document.getElementById("overlays")}
               />
             )}
           />
 
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Área (ha)"
-              placeholder="0"
-              required
-              type="number"
-              step="0.0001"
-              error={errors.areaHectares?.message}
-              {...register('areaHectares', { required: 'Requerido', min: { value: 0, message: 'Valor no válido' } })}
-            />
-            <Input
-              label="Cód. catastral"
-              placeholder='Ingresa el código'
-              {...register('cadastralCode')}
-            />
-          </div>
+          <Controller
+            name="ownerUserId"
+            control={control}
+            rules={{ required: 'Selecciona un propietario' }}
+            render={({ field }) => (
+              <Select
+                label="Propietario"
+                isDisabled={isSaving}
+                error={errors.ownerUserId?.message}
+                options={userOptions}
+                value={userOptions.find((o) => o.value === field.value)}
+                onChange={(opt) => field.onChange((opt as IOption)?.value)}
+              />
+            )}
+          />
+        </div>
 
-          <div className="flex items-center space-x-2 border-t pt-4">
-            <Checkbox
-              id="show-subplots"
-              checked={showSubPlots.active}
-              onCheckedChange={(v) => showSubPlots.set(!!v)}
+        <Controller
+          name="workerUserId"
+          control={control}
+          render={({ field }) => (
+            <Select
+              label="Arrendatario"
+              isDisabled={isSaving}
+              isClearable
+              options={userOptions}
+              value={userOptions.find((o) => o.value === field.value)}
+              onChange={(opt) => field.onChange((opt as IOption)?.value ?? '')}
+              placeholder="Sin asignar (opcional)"
             />
-            <label htmlFor="show-subplots" className="text-sm font-medium leading-none cursor-pointer">
-              Agregar sub divisiones
-            </label>
-          </div>
+          )}
+        />
 
-          {showSubPlots.active && (
-            <div className="rounded-lg border bg-gray-50/50 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase text-gray-500">Sub divisiones de terreno</span>
+        <div className="grid grid-cols-2 gap-3">
+          <Input
+            label="Área (ha)"
+            placeholder="0"
+            required
+            type="number"
+            step="0.0001"
+            error={errors.areaHectares?.message}
+            {...register('areaHectares', { required: 'Requerido', min: { value: 0, message: 'Valor no válido' } })}
+          />
+          <Input
+            label="Cód. catastral"
+            placeholder='Ingresa el código'
+            {...register('cadastralCode')}
+          />
+        </div>
+
+        <div className="flex items-center space-x-2 border-t pt-4">
+          <Checkbox
+            id="show-subplots"
+            checked={showSubPlots.active}
+            onCheckedChange={(v) => showSubPlots.set(!!v)}
+          />
+          <label htmlFor="show-subplots" className="text-sm font-medium leading-none cursor-pointer">
+            Agregar sub divisiones
+          </label>
+        </div>
+
+        {showSubPlots.active && (
+          <div className="rounded-lg border bg-gray-50/50 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase text-gray-500">Sub divisiones de terreno</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => append({ name: '', areaHectares: '', responsibleUserId: '' })}
+              >
+                <Plus className="mr-1 h-3 w-3" /> Añadir
+              </Button>
+            </div>
+
+            {fields.map((field, i) => (
+              <div key={field.id} className="grid grid-cols-[1fr_100px_1fr_auto] gap-2 items-start">
+                <Input
+                  placeholder="Nombre"
+                  error={errors.subPlots?.[i]?.name?.message}
+                  {...register(`subPlots.${i}.name`, { required: 'Requerido' })}
+                />
+                <Input
+                  type="number"
+                  step="0.0001"
+                  placeholder="Área"
+                  error={errors.subPlots?.[i]?.areaHectares?.message}
+                  {...register(`subPlots.${i}.areaHectares`, { required: 'Requerido' })}
+                />
+                <Controller
+                  name={`subPlots.${i}.responsibleUserId`}
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      options={userOptions}
+                      isDisabled={isSaving}
+                      isClearable
+                      menuPosition="fixed"
+                      value={userOptions.find((o) => o.value === field.value)}
+                      onChange={(opt) => field.onChange((opt as IOption)?.value ?? '')}
+                      placeholder="Titular"
+                    />
+                  )}
+                />
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append({ name: '', areaHectares: '', responsibleUserId: '' })}
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => remove(i)}
+                  className="text-gray-400 hover:text-red-500"
                 >
-                  <Plus className="mr-1 h-3 w-3" /> Añadir
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-
-              {fields.map((field, i) => (
-                <div key={field.id} className="grid grid-cols-[1fr_100px_1fr_auto] gap-2 items-start">
-                  <Input
-                    placeholder="Nombre"
-                    error={errors.subPlots?.[i]?.name?.message}
-                    {...register(`subPlots.${i}.name`, { required: 'Requerido' })}
-                  />
-                  <Input
-                    type="number"
-                    step="0.0001"
-                    placeholder="Área"
-                    error={errors.subPlots?.[i]?.areaHectares?.message}
-                    {...register(`subPlots.${i}.areaHectares`, { required: 'Requerido' })}
-                  />
-                  <Controller
-                    name={`subPlots.${i}.responsibleUserId`}
-                    control={control}
-                    render={({ field }) => (
-                      <Select
-                        options={userOptions}
-                        isClearable
-                        menuPosition="fixed"
-                        value={userOptions.find((o) => o.value === field.value)}
-                        onChange={(opt) => field.onChange((opt as IOption)?.value ?? '')}
-                        placeholder="Titular"
-                      />
-                    )}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove(i)}
-                    className="text-gray-400 hover:text-red-500"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </form>
-      )}
+            ))}
+          </div>
+        )}
+      </FormFieldset>
     </Modal>
   );
 };
