@@ -15,7 +15,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     <div className="w-full">
       {label && (
         <label className="mb-1 flex justify-between text-sm font-medium text-gray-700">
-          {/* TODO: cuando sea optional, agregar bade "Opcional", definir componente con shadcn */}
           {label} {isOptional && <Badge variant="secondary" className='text-xs'>Opcional</Badge>}
         </label>
       )}
