@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
+import { createPortal } from "react-dom";
 
 interface ConfirmModalProps {
   open: boolean;
@@ -28,25 +29,27 @@ export const ConfirmModal = ({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-60 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
-    >
+    createPortal(
       <div
-        className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
-        style={{ animation: 'modal-in 200ms cubic-bezier(0.23,1,0.32,1) both' }}
+        className="fixed inset-0 z-60 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}
       >
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
-        {description && <p className="mt-1.5 text-sm text-gray-500">{description}</p>}
-        <div className="mt-4 flex justify-end gap-2">
-          <Button onClick={onCancel} variant='outline'>
-            {cancelLabel}
-          </Button>
-          <Button onClick={onConfirm} variant={variant}>
-            {confirmLabel}
-          </Button>
+        <div
+          className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"
+          style={{ animation: 'modal-in 200ms cubic-bezier(0.23,1,0.32,1) both' }}
+        >
+          <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+          {description && <p className="mt-1.5 text-sm text-gray-500">{description}</p>}
+          <div className="mt-4 flex justify-end gap-2">
+            <Button onClick={onCancel} variant='outline'>
+              {cancelLabel}
+            </Button>
+            <Button onClick={onConfirm} variant={variant}>
+              {confirmLabel}
+            </Button>
+          </div>
         </div>
-      </div>
-    </div>
+      </div>,
+       document.getElementById('overlays') as HTMLElement)
   );
 };
