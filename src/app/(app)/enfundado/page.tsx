@@ -20,6 +20,7 @@ import { isBundlingArray } from '@/modules/bundlings/services/bundling.service';
 import { getQueuedBundlings } from '@/lib/offline/sync-manager';
 import type { QueuedBundling } from '@/lib/offline/db';
 import { useListUserPlots } from '@/modules/users/hooks/useListUserPlots';
+import { Button } from '@/components/ui/button';
 
 // ─── Pending badge ────────────────────────────────────────────────────────────
 
@@ -164,13 +165,10 @@ const EnfundadoPage = () => {
               )}
             </p>
           </div>
-          <button
-            onClick={openCreate}
-            className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#27ae60] px-4 py-2 text-sm font-medium text-white shadow-sm transition-[transform,background-color] duration-160 ease-out hover:bg-[#219a52] active:scale-[0.97]"
-          >
+          <Button onClick={openCreate} >
             <Plus className="h-4 w-4" />
             Registrar enfunde
-          </button>
+          </Button>
         </div>
 
         {ListBundlings.loading && totalCount === 0 && (
