@@ -310,7 +310,6 @@ export const BundlingFormModal = ({
             <div className={isMultiMode ? '' : 'grid grid-cols-2 gap-3'}>
               <Input
                 label="Fecha"
-                required
                 type="date"
                 max={todayIso()}
                 error={errors.bundledAt?.message}
@@ -360,7 +359,7 @@ export const BundlingFormModal = ({
                       <ListChecks className="h-3.5 w-3.5 text-[#27ae60]" />
                       {includedCount} lote{includedCount !== 1 ? 's' : ''}
                     </Badge>
-                    <Badge variant='outline' className='text-sm h-6'>
+                    <Badge variant='outline' className='text-sm h-6 border-primary'>
                       <Package2 className="h-3.5 w-3.5 text-[#27ae60]" />
                       {totalFundas.toLocaleString()} fundas
                     </Badge>
@@ -405,10 +404,10 @@ export const BundlingFormModal = ({
               {!isMultiMode && (
                 <>
                   <div>
-                    <label className="mb-2 block text-xs font-medium text-gray-700">
-                      Color de cinta <span className="text-red-500">*</span>
+                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                      Color de cinta
                     </label>
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-6 gap-1">
                       {RIBBON_COLORS.map((color) => (
                         <label key={color} className="cursor-pointer">
                           <input
@@ -417,7 +416,7 @@ export const BundlingFormModal = ({
                             {...register('ribbonColorFree')}
                             className="peer sr-only"
                           />
-                          <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-transparent p-2 transition-colors peer-checked:border-[#27ae60] peer-checked:bg-[#27ae60]/5">
+                          <div className="flex flex-col items-center gap-1 rounded-xl border-2 border-transparent p-1 transition-colors peer-checked:border-[#27ae60] peer-checked:bg-[#27ae60]/5">
                             <span
                               className="h-6 w-6 rounded-full border border-black/10 shadow-sm"
                               style={{ backgroundColor: RIBBON_COLOR_HEX[color as RibbonColor] }}
@@ -434,8 +433,8 @@ export const BundlingFormModal = ({
                     )}
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-gray-700">
-                      Observaciones <span className="text-gray-400">(opcional)</span>
+                    <label className="flex justify-between mb-1 text-sm font-medium text-gray-700">
+                      Observaciones <Badge variant="secondary" className='text-sm'>Opcional</Badge>
                     </label>
                     <textarea
                       rows={2}

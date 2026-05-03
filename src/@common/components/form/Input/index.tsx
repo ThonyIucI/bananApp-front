@@ -1,20 +1,22 @@
 'use client';
 
+import { Badge } from '@/components/ui/badge';
 import { forwardRef } from 'react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
-  required?: boolean;
+  isOptional?: boolean;
 }
 
 /** Styled text input with label and inline error message. */
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, required, className = '', ...props }, ref) => (
+  ({ label, error, isOptional, className = '', ...props }, ref) => (
     <div className="w-full">
       {label && (
-        <label className="mb-1 block text-sm text-gray-700">
-          {label} {required && <span className="text-red-500">*</span>}
+        <label className="mb-1 flex justify-between text-sm font-medium text-gray-700">
+          {/* TODO: cuando sea optional, agregar bade "Opcional", definir componente con shadcn */}
+          {label} {isOptional && <Badge variant="secondary" className='text-xs'>Opcional</Badge>}
         </label>
       )}
       <input
@@ -25,7 +27,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           'placeholder:text-gray-400 outline-none transition-colors',
           error
             ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-            : 'border-gray-300 hover:border-gray-400 focus:border-[#27ae60] focus:ring-2 focus:ring-[#27ae60]/20',
+            : 'border-gray-300 disabled:opacity-60 enabled:hover:border-gray-400 focus:border-[#27ae60] focus:ring-2 focus:ring-[#27ae60]/20',
           className,
         ]
           .filter(Boolean)
