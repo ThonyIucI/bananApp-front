@@ -28,7 +28,7 @@ import { SubPlotEntryRow } from './SubPlotEntryRow';
 import type { UserPlotResponse } from '@/modules/users/services/user-plot.service';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertTitle } from '@/components/ui/alert';
 
 interface BundlingFormModalProps {
   open: boolean;
@@ -66,7 +66,7 @@ export const BundlingFormModal = ({
   const GetPlot = useGetPlot();
 
   const isEditing = !!bundling;
-  const isLoading = CreateBundling.loading || UpdateBundling.loading;
+  const isSaving = CreateBundling.loading || UpdateBundling.loading;
 
   const plotOptions: IOption[] = plots.map((p) => ({
     value: p.plot.id,
@@ -106,7 +106,7 @@ export const BundlingFormModal = ({
   const includedCount = (subPlotEntries ?? []).filter((e) => e.included).length;
   const totalFundas = (subPlotEntries ?? [])
     .filter((e) => e.included)
-    .reduce((sum, e) => sum + (e.quantity || 0), 0);
+    .reduce((sum, e) => sum + (e.quantity as number || 0), 0);
 
   // ── Reset on open ────────────────────────────────────────────────────────────
 
@@ -151,11 +151,16 @@ export const BundlingFormModal = ({
   const handlePlotChange = async (newPlotId: string) => {
     setValue('plotId', newPlotId, { shouldDirty: true, shouldValidate: true });
     replaceSubPlotFields([]);
+
     const plotData = await GetPlot.handler(newPlotId);
+    const hasSubPlots = !!plotData?.subPlots?.length;
+    setValue('hasSubPlots', hasSubPlots, { shouldDirty: true });
+
     if (!plotData?.subPlots?.length) return;
+
     const enfundadorId = getValues('enfundadorUserId') || userId || '';
     replaceSubPlotFields(
-      plotData.subPlots.map((sp) => ({
+      plotData?.subPlots?.map((sp) => ({
         included: true,
         plotId: newPlotId,
         subPlotId: sp.id,
@@ -170,14 +175,13 @@ export const BundlingFormModal = ({
   };
 
   // ── Submit ───────────────────────────────────────────────────────────────────
-
   const onSubmit = async (v: CreateBundlingFormValues) => {
     if (isEditing) {
       const result = await UpdateBundling.handler(
         bundling.id,
         {
           subPlotId: v.subPlotId ?? null,
-          quantity: v.quantity ?? 0,
+          quantity: (v.quantity ?? 0) as number,
           bundledAt: v.bundledAt,
           ribbonColorFree: v.ribbonColorFree,
           notes: v.notes || null,
@@ -202,7 +206,7 @@ export const BundlingFormModal = ({
           bundledAt: v.bundledAt,
           subPlotId: entry.subPlotId,
           enfundadorUserId: entry.enfundadorUserId,
-          quantity: entry.quantity,
+          quantity: entry.quantity as number,
           localUuid: entry.localUuid,
           ribbonColorFree: entry.ribbonColorFree,
           notes: entry.notes || undefined,
@@ -221,7 +225,7 @@ export const BundlingFormModal = ({
       plotId: v.plotId,
       subPlotId: v.subPlotId,
       enfundadorUserId: v.enfundadorUserId ?? userId,
-      quantity: v.quantity ?? 0,
+      quantity: (v.quantity ?? 0) as number,
       bundledAt: v.bundledAt,
       ribbonColorFree: v.ribbonColorFree,
       notes: v.notes || undefined,
@@ -245,30 +249,6 @@ export const BundlingFormModal = ({
     return 'Registrar';
   })();
 
-  // ── Plot select (shared between modes) ──────────────────────────────────────
-
-  const renderPlotSelect = (
-    <Controller
-      name="plotId"
-      control={control}
-      render={() => (
-        <Select
-          label="Parcela"
-          required
-          isDisabled={isEditing}
-          error={errors.plotId?.message}
-          options={plotOptions}
-          value={plotOptions.find((o) => o.value === getValues('plotId')) ?? null}
-          onChange={(opt) => {
-            const newId = (opt as IOption | null)?.value ?? '';
-            if (newId) handlePlotChange(newId);
-          }}
-          placeholder="Seleccionar parcela..."
-        />
-      )}
-    />
-  );
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -284,7 +264,7 @@ export const BundlingFormModal = ({
               type="button"
               variant="outline"
               onClick={tryClose}
-              disabled={isLoading}
+              disabled={isSaving}
               className="flex-1 sm:flex-none h-11 sm:h-9 sm:px-4"
             >
               Cancelar
@@ -292,8 +272,8 @@ export const BundlingFormModal = ({
             <Button
               type="submit"
               form="bundling-form"
-              disabled={isLoading || (isMultiMode && includedCount === 0 && subPlotFields.length > 0)}
-              isLoading={isLoading}
+              disabled={isSaving}
+              isLoading={isSaving}
               className="flex-1 sm:flex-none h-11 sm:h-9 sm:px-4"
             >
               {submitLabel}
@@ -304,33 +284,49 @@ export const BundlingFormModal = ({
         <FormFieldset
           id="bundling-form"
           onSubmit={handleSubmit(onSubmit)}
-          disabled={isLoading}
+          disabled={isSaving}
         >
           {/* ── Plot + Fecha/Cantidad ─────────────────────────────────────── */}
-          {renderPlotSelect}
-          <div className={isMultiMode ? '' : 'grid grid-cols-2 gap-3'}>
-            <Input
-              label="Fecha"
-              required
-              type="date"
-              max={todayIso()}
-              error={errors.bundledAt?.message}
-              {...register('bundledAt')}
-            />
-            {!isMultiMode && (
-              <Input
-                label="Cantidad de fundas"
-                required
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={99999}
-                placeholder="0"
-                error={errors.quantity?.message}
-                {...register('quantity', { valueAsNumber: true })}
+          <Controller
+            name="plotId"
+            control={control}
+            render={() => (
+              <Select
+                label="Parcela"
+                isDisabled={isEditing}
+                error={errors.plotId?.message}
+                options={plotOptions}
+                value={plotOptions.find((o) => o.value === getValues('plotId')) ?? null}
+                onChange={(opt) => {
+                  const newId = (opt as IOption | null)?.value ?? '';
+                  if (newId) handlePlotChange(newId);
+                }}
+                placeholder="Seleccionar parcela..."
               />
             )}
-          </div>
+          />
+          {GetPlot.loading ?
+            <Skeleton className='h-15' /> :
+            <div className={isMultiMode ? '' : 'grid grid-cols-2 gap-3'}>
+              <Input
+                label="Fecha"
+                required
+                type="date"
+                max={todayIso()}
+                error={errors.bundledAt?.message}
+                {...register('bundledAt')}
+              />
+              {!isMultiMode && (
+                <Input
+                  label="Cantidad de fundas"
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="0"
+                  error={errors.quantity?.message}
+                  {...register('quantity')}
+                />
+              )}
+            </div>}
 
           {/* ── Enfundador: admin only, aplica a todas las filas en multi ── */}
           {isAdmin && !!users.length && (
@@ -340,7 +336,6 @@ export const BundlingFormModal = ({
               render={({ field }) => (
                 <Select
                   label="Enfundador"
-                  required
                   isDisabled={isEditing}
                   error={errors.enfundadorUserId?.message}
                   options={userOptions}
@@ -357,7 +352,7 @@ export const BundlingFormModal = ({
             <div>
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                 Detalles
+                  Detalles
                 </p>
                 {subPlotFields.length > 0 && (
                   <div className="flex items-center gap-1 text-sm text-gray-500">
@@ -372,11 +367,11 @@ export const BundlingFormModal = ({
                   </div>
                 )}
               </div>
-              {!GetPlot.loading && includedCount === 0 && subPlotFields.length > 0 && (
-                <Alert className="max-w-md mb-2" variant='warning'>
-                <TriangleAlert />
-                  <AlertTitle> Debe seleccionar al menos un sub lote</AlertTitle>
-              </Alert>
+              {!GetPlot.loading && getValues('hasSubPlots') && errors.subPlotEntries && includedCount === 0 && subPlotFields.length > 0 && (
+                <Alert className="w-full mb-2 " variant='warning'>
+                  <TriangleAlert />
+                  <AlertTitle>{errors.subPlotEntries?.root?.message || 'Debe seleccionar al menos un sub lote'}</AlertTitle>
+                </Alert>
               )}
               <div className="space-y-2">
                 {subPlotFields.map((field, i) => {
@@ -390,7 +385,7 @@ export const BundlingFormModal = ({
                       control={control}
                       register={register}
                       errors={errors}
-                      isLoading={isLoading}
+                      isLoading={isSaving}
                     />
                   );
                 })}
