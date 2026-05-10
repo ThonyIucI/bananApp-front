@@ -4,7 +4,7 @@ import { z } from 'zod';
 if (typeof window !== 'undefined' || !global.__zod_globalRegistry) {
     z.config({
         localeError: z.locales.es().localeError,
-        customError: (iss) => {
+        customError: (iss) => {           
             if (iss.code === "invalid_type") {
                 switch (iss.expected) {
                     case 'undefined':
@@ -27,7 +27,16 @@ if (typeof window !== 'undefined' || !global.__zod_globalRegistry) {
             if (iss.code === "too_big") {
                 return `Máximo ${iss.maximum} ${originValidation(iss.origin)}`;
             }
-            return iss.message;
+            if (iss.code === "invalid_format") {
+                switch (iss.format) {
+                    case 'email':
+                        return 'Debe ser un email válido';
+                    case 'date':
+                        return 'Debe ser una fecha válida';
+                    default:
+                        return iss.message;
+                }
+            }
         },
     });
 }
@@ -69,4 +78,4 @@ export const forwardZodIssues = (
 };
 
 
-export { z };
+export { z as customZ };
