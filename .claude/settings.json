@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /home/thony/own/saas/front/graphify-out/ 2>/dev/null || mkdir -p /home/thony/own/saas/front/graphify-out/)",
+      "Bash(awk '{print $NF, $5}')",
+      "Bash(graphify export *)",
+      "Bash(graphify benchmark *)"
+    ],
+    "additionalDirectories": [
+      "/home/thony/own/saas/front/graphify-out"
+    ]
+  }
+}
