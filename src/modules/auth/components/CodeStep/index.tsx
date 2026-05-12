@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 import { GoogleAuthButton } from '@/modules/auth/components/GoogleAuthButton';
 import { useRequestRegistration } from '@/modules/auth/hooks/useRequestRegistration';
+import { useValidateRegistrationCode } from '@/modules/auth/hooks/useValidateRegistrationCode';
 import { ArrowLeft } from 'lucide-react';
 
 const codeStepSchema = customZ.object({
@@ -25,20 +26,18 @@ interface ICodeStepProps {
   onBack: () => void;
 }
 
-/**
- * Paso 2 del registro: ingresa el código de 6 dígitos enviado al email.
- * Solo valida el formato y notifica al padre con el código — no llama a la API.
- */
 export const CodeStep = ({ email, onBack, onSuccess }: ICodeStepProps) => {
   const RequestRegistration = useRequestRegistration();
+  const ValidateCode = useValidateRegistrationCode();
 
   const { handleSubmit, control, formState: { errors } } = useForm<TCodeStepValues>({
     resolver: zodResolver(codeStepSchema),
     defaultValues: { code: '' },
   });
 
-  const onSubmit = ({ code }: TCodeStepValues) => {
-    onSuccess(code);
+  const onSubmit = async ({ code }: TCodeStepValues) => {
+    const result = await ValidateCode.handler({ email, code });
+    if (result) onSuccess(code);
   };
 
   const handleResend = async () => {
@@ -89,9 +88,10 @@ export const CodeStep = ({ email, onBack, onSuccess }: ICodeStepProps) => {
       <Button
         type="submit"
         size="lg"
+        isLoading={ValidateCode.loading}
         className="h-11 w-full font-semibold active:scale-[0.97]"
       >
-        Verificar código
+        {ValidateCode.loading ? 'Verificando…' : 'Verificar código'}
       </Button>
 
       <div className="flex items-center justify-between">

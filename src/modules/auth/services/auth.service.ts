@@ -10,6 +10,8 @@ import type {
   TResendVerificationPayload,
   TRequestRegistrationPayload,
   TRequestRegistrationResponse,
+  TValidateRegistrationCodePayload,
+  TValidateRegistrationCodeResponse,
   TCompleteRegistrationPayload,
   TCompleteRegistrationResponse,
 } from '../types/auth.types';
@@ -34,6 +36,9 @@ export const registerRequest = (payload: TRegisterPayload) =>
 
 export const verifyEmailRequest = (payload: TVerifyEmailPayload) =>
   apiClient.post<TVerifyEmailResponse>('/auth/verify-email', payload);
+
+export const validateRegistrationCodeRequest = (payload: TValidateRegistrationCodePayload) =>
+  apiClient.post<TValidateRegistrationCodeResponse>('/auth/validate-registration-code', payload);
 
 export const resendVerificationRequest = (payload: TResendVerificationPayload) =>
   apiClient.post<{ success: true }>('/auth/resend-verification', payload);

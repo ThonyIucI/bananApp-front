@@ -73,7 +73,7 @@ export const EmailVerificationForm = ({ userId, email, onSuccess }: EmailVerific
           disabled={isDisabled}
           className="h-12 w-full font-bold"
         >
-          {VerifyEmail.loading ? 'Verificando...' : 'Verificar código'}
+          {VerifyEmail.loading ? 'Validando...' : 'Validar código'}
         </Button>
       </FormFieldset>
 

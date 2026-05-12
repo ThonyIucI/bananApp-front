@@ -9,6 +9,12 @@ export interface CooperativeMembership {
   memberCode: string | null;
   roles: string[];
 }
+export interface IUserRole {
+  id: string;
+  key: string;
+  name: string;
+  description: string;  
+}
 
 export interface AuthUser {
   id: string;
@@ -22,6 +28,7 @@ export interface AuthUser {
   mustChangePassword: boolean;
   createdAt: string;
   cooperatives: CooperativeMembership[];
+  userRoles: string[];
 }
 
 export interface LoginResponse {
@@ -89,6 +96,15 @@ export interface TCompleteRegistrationPayload {
   firstName: string;
   lastName: string;
   password: string;
+}
+
+export interface TValidateRegistrationCodePayload {
+  email: string;
+  code: string;
+}
+
+export interface TValidateRegistrationCodeResponse {
+  message: string;
 }
 
 export interface TCompleteRegistrationResponse {
