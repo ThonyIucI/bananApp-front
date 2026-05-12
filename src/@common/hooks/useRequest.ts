@@ -30,6 +30,12 @@ const useRequest = <T = unknown, Args extends unknown[] = unknown[]>(
       setError(null);
       try {
         const result = await fn();
+        if (result && typeof result === 'object' && 'message' in result) {
+          const msg = result.message;
+          if (typeof msg === 'string' && msg.length > 0) {
+            toast.success(msg);
+          }
+        }
         setData(result);
         return result;
       } catch (err) {
