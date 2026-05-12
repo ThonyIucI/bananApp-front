@@ -36,7 +36,7 @@ export const createBundlingSchema = customZ
     quantity: customZ.coerce
       .number()
       .optional(),
-    ribbonColorFree: customZ.enum(RIBBON_COLORS).optional(),
+    ribbonColorFree: customZ.enum(RIBBON_COLORS, 'Ingresar un color correcto').optional(),
     bundledAt: customZ
       .string()
       .min(1, 'La fecha es requerida')
