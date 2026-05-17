@@ -432,7 +432,7 @@ export const BundlingFormModal = ({
                     )}
                   </div>
                   <div>
-                    <label className="flex justify-between mb-1 text-sm font-medium text-gray-700">
+                    <label className="flex justify-between mb-1 text-xs font-medium text-gray-700">
                       Observaciones <Badge variant="secondary" className='text-sm'>Opcional</Badge>
                     </label>
                     <textarea

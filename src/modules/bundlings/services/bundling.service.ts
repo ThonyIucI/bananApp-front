@@ -164,6 +164,17 @@ export interface StatsRibbonColor {
   totalQuantity: number;
 }
 
+export interface StatsHarvestColorEntry {
+  color: string;
+  totalQuantity: number;
+}
+
+export interface StatsHarvestThisWeek {
+  estimatedBunches: number;
+  totalRecords: number;
+  byRibbonColor: StatsHarvestColorEntry[];
+}
+
 export interface StatsOverviewResponse {
   thisWeek: StatsPeriodKpi;
   thisMonth: StatsPeriodKpi;
@@ -171,6 +182,12 @@ export interface StatsOverviewResponse {
   topEnfundadores: StatsTopEnfundador[];
   topPlots: StatsTopPlot[];
   ribbonColorDistribution: StatsRibbonColor[];
+  harvestThisWeek: StatsHarvestThisWeek;
+}
+
+export interface StatsOverviewFilters {
+  scopedUserId?: string;
+  enfundadorUserId?: string;
 }
 
 /** Lists bundlings with optional filters. */
@@ -224,31 +241,34 @@ export const bundlingSummaryRequest = async (
 export const statsMonthlyRequest = async (
   cooperativeId: string,
   months = 12,
+  filters?: StatsOverviewFilters,
 ): Promise<StatsMonthlyResponse> => {
   const res = await apiClient.get<StatsMonthlyResponse>('/bundlings/stats/monthly', {
-    params: { cooperativeId, months },
+    params: { cooperativeId, months, ...filters },
   });
   return res.data;
 };
 
-/** Weekly stats for the last N weeks, optionally filtered by enfundador. */
+/** Weekly stats for the last N weeks, optionally filtered by enfundador or plotIds. */
 export const statsWeeklyRequest = async (
   cooperativeId: string,
   weeks = 8,
   enfundadorUserId?: string,
+  filters?: StatsOverviewFilters,
 ): Promise<StatsWeeklyResponse> => {
   const res = await apiClient.get<StatsWeeklyResponse>('/bundlings/stats/weekly', {
-    params: { cooperativeId, weeks, enfundadorUserId },
+    params: { cooperativeId, weeks, enfundadorUserId, ...filters },
   });
   return res.data;
 };
 
-/** Overview KPIs for the dashboard cards. */
+/** Overview KPIs for the dashboard cards. Supports optional role-based filters. */
 export const statsOverviewRequest = async (
   cooperativeId: string,
+  filters?: StatsOverviewFilters,
 ): Promise<StatsOverviewResponse> => {
   const res = await apiClient.get<StatsOverviewResponse>('/bundlings/stats/overview', {
-    params: { cooperativeId },
+    params: { cooperativeId, ...filters },
   });
   return res.data;
 };

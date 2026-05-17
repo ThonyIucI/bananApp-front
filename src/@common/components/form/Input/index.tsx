@@ -26,7 +26,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           'placeholder:text-gray-400 outline-none transition-colors',
           error
             ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-            : 'border-gray-300 disabled:opacity-60 enabled:hover:border-gray-400 focus:border-[#27ae60] focus:ring-2 focus:ring-[#27ae60]/20',
+            : 'border-gray-300 disabled:opacity-60 enabled:hover:border-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/20',
           className,
         ]
           .filter(Boolean)

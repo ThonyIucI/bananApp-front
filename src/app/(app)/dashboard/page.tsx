@@ -6,10 +6,10 @@ import {
   Leaf,
   CalendarDays,
   Users,
-  Banana,
   MapPin,
   BarChart3,
   Calendar,
+  Sprout,
 } from 'lucide-react';
 import { useAuthContext } from '@/modules/auth/context/auth.context';
 import { useStatsOverview } from '@/modules/dashboard/hooks/useStatsOverview';
@@ -22,9 +22,10 @@ import { WeeklyTrendChart } from '@/modules/dashboard/components/WeeklyTrendChar
 import { TopEnfundadoresList } from '@/modules/dashboard/components/TopEnfundadoresList';
 import { TopPlotsList } from '@/modules/dashboard/components/TopPlotsList';
 import { RibbonColorDonut } from '@/modules/dashboard/components/RibbonColorDonut';
+import { HarvestColorChart } from '@/modules/dashboard/components/HarvestColorChart';
 import { APP_ROUTES, PLOT_ROUTES, BUNDLING_ROUTES } from '@/@common/constants/routes';
+import type { StatsOverviewFilters } from '@/modules/bundlings/services/bundling.service';
 
-/** Section card wrapper */
 const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
     <p className="mb-4 text-sm font-semibold text-gray-700">{title}</p>
@@ -32,7 +33,6 @@ const SectionCard = ({ title, children }: { title: string; children: React.React
   </div>
 );
 
-/** Full-width skeleton placeholder */
 const ChartSkeleton = ({ height = 'h-64' }: { height?: string }) => (
   <div className={`${height} animate-pulse rounded-xl bg-gray-100`} />
 );
@@ -46,6 +46,7 @@ export default function DashboardPage() {
   const userRoles = user?.cooperatives?.flatMap((c) => c.roles) ?? [];
   const isAdmin = isSuperadmin || userRoles.includes('admin');
   const isBagger = !isAdmin && userRoles.includes('enfundador');
+  const isMember = !isAdmin && !isBagger;
 
   const Overview = useStatsOverview();
   const Monthly = useStatsMonthly();
@@ -55,53 +56,41 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!cooperativeId) return;
 
-    Promise.all([
-      Overview.handler(cooperativeId),
-      Monthly.handler(cooperativeId, 12),
-      Weekly.handler(
-        cooperativeId,
-        8,
-        isBagger && user ? user.id : undefined,
-      ),
-    ]);
+    const filters: StatsOverviewFilters | undefined = !isAdmin && user
+      ? { scopedUserId: user.id }
+      : undefined;
 
-    if (isBagger && user && cooperativeId) {
+    Overview.handler(cooperativeId, filters);
+    Monthly.handler(cooperativeId, 12, filters);
+    Weekly.handler(cooperativeId, 8, undefined, filters);
+
+    if (!isAdmin && user) {
       UserPlots.handler({ userId: user.id, cooperativeId });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cooperativeId, isBagger, user?.id]);
+  }, [cooperativeId, isAdmin, user?.id]);
 
   const overview = Overview.data;
   const months = Monthly.data?.months ?? [];
   const weeks = Weekly.data?.weeks ?? [];
   const assignedPlots = UserPlots.data ?? [];
+  const harvestData = overview?.harvestThisWeek?.byRibbonColor ?? [];
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 animate-page-in">
-      {/* ── Header ── */}
+    <div className="mx-auto max-w-5xl space-y-3 animate-page-in">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">
           Hola, {user?.fullName?.split(' ')[0]}
         </h1>
-        {cooperative && (
-          <p className="mt-1 text-sm text-gray-500">
-            {cooperative.cooperativeName}
-            {cooperative.memberCode && (
-              <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
-                {cooperative.memberCode}
-              </span>
-            )}
-          </p>
-        )}
       </div>
 
-      {/* ── Fila 1: KPI Cards ── */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <KpiCard
           icon={Leaf}
           label="Fundas esta semana"
           value={overview?.thisWeek.totalQuantity.toLocaleString('es') ?? '—'}
-          description={`${overview?.thisWeek.totalRecords ?? 0} registros`}
           deltaPct={overview?.thisWeek.deltaPctVsLastPeriod}
           loading={Overview.loading}
         />
@@ -109,7 +98,6 @@ export default function DashboardPage() {
           icon={CalendarDays}
           label="Fundas este mes"
           value={overview?.thisMonth.totalQuantity.toLocaleString('es') ?? '—'}
-          description={`${overview?.thisMonth.totalRecords ?? 0} registros`}
           deltaPct={overview?.thisMonth.deltaPctVsLastPeriod}
           loading={Overview.loading}
         />
@@ -117,32 +105,26 @@ export default function DashboardPage() {
           icon={Users}
           label="Enfundadores activos"
           value={overview?.last30Days.activeEnfundadores ?? '—'}
-          description="últimos 30 días"
           loading={Overview.loading}
         />
         <KpiCard
-          icon={Banana}
-          label="Parcelas activas"
-          value={overview?.last30Days.activePlots ?? '—'}
-          description="últimos 30 días"
+          icon={Sprout}
+          label="Cosecha est. esta semana"
+          value={overview?.harvestThisWeek?.estimatedBunches?.toLocaleString('es') ?? '—'}
           loading={Overview.loading}
         />
       </div>
 
-      {/* ── Fila 2: Tendencia mensual (12 meses) ── */}
+      {/* Tendencia mensual */}
       <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-700">Tendencia mensual</p>
           <span className="text-xs text-gray-400">últimos 12 meses</span>
         </div>
-        {Monthly.loading ? (
-          <ChartSkeleton />
-        ) : (
-          <MonthlyTrendChart data={months} />
-        )}
+        {Monthly.loading ? <ChartSkeleton /> : <MonthlyTrendChart data={months} />}
       </div>
 
-      {/* ── Fila 3: Tendencia semanal + Distribución de cintas ── */}
+      {/* Tendencia semanal + Distribución cintas */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
@@ -166,7 +148,12 @@ export default function DashboardPage() {
         </SectionCard>
       </div>
 
-      {/* ── Fila 4: Top enfundadores + Top parcelas (admin) / Mis parcelas (bagger) ── */}
+      {/* Cosecha estimada esta semana */}
+      <SectionCard title="Cosecha estimada esta semana">
+        <HarvestColorChart data={harvestData} loading={Overview.loading} />
+      </SectionCard>
+
+      {/* Top enfundadores + Top parcelas (admin) / Mis parcelas (bagger/member) */}
       {isAdmin ? (
         <div className="grid gap-4 md:grid-cols-2">
           <SectionCard title="Top enfundadores — últimos 30 días">
@@ -184,7 +171,6 @@ export default function DashboardPage() {
           </SectionCard>
         </div>
       ) : (
-        /* Vista personal del enfundador: sus parcelas asignadas */
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <p className="text-sm font-semibold text-gray-700">Mis parcelas asignadas</p>
@@ -228,7 +214,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ── Fila 5: Quick actions (admin) / Acciones del enfundador ── */}
+      {/* Quick actions */}
       <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
         {(isBagger || !isAdmin) && (
           <Link
