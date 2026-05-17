@@ -52,7 +52,7 @@ export const ChatInput = ({ onSubmit, disabled }: ChatInputProps) => {
         <Button
           type="button"
           variant="outline"
-          size="icon"
+          size="icon-lg"
           disabled
           aria-label="Entrada de voz (disponible pronto)"
           className="hidden shrink-0 cursor-not-allowed opacity-40 sm:flex"
