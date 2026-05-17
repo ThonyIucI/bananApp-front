@@ -1,7 +1,7 @@
 {
   "name": "CultivApp",
   "short_name": "CultivApp",
-  "description": "Gestión de cultivos para cooperativas agrícolas",
+  "description": "Gestión de cultivos para agricultores o cooperativas",
   "display": "standalone",
   "orientation": "portrait",
   "theme_color": "#27ae60",

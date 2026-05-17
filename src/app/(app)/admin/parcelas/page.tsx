@@ -16,13 +16,15 @@ import { PlotDetailPanel } from '@/modules/plots/components/PlotDetailPanel';
 import { RowActions } from '@/@common/components/RowActions';
 import type { PlotResponse } from '@/modules/plots/services/plot.service';
 
-/** Plot list page — admin sees all plots with CRUD; member sees only their assigned plots (read-only). */
+/** Plot list page — admin and independent_farmer can create plots; member sees assigned plots (read-only). */
 const ParcelasPage = () => {
   const { user } = useAuthContext();
   const cooperativeId = user?.cooperatives?.[0]?.cooperativeId ?? '';
   const userId = user?.id ?? '';
   const userRoles = user?.cooperatives?.[0]?.roles ?? [];
   const isAdmin = user?.isSuperadmin || userRoles.includes('admin');
+  const isIndependentFarmer = user?.userRoles?.includes('independent_farmer') ?? false;
+  const canCreatePlot = isAdmin || isIndependentFarmer;
 
   const ListPlots = useListPlots();
   const ListSectors = useListSectors();
@@ -44,6 +46,10 @@ const ParcelasPage = () => {
   // ── Load data ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (isIndependentFarmer) {
+      ListPlots.handler({ ownerUserId: userId, limit: 100 });
+      return;
+    }
     if (!cooperativeId) return;
     if (isAdmin) {
       ListPlots.handler({ cooperativeId, limit: 100 });
@@ -54,12 +60,11 @@ const ParcelasPage = () => {
       ListSectors.handler(cooperativeId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cooperativeId, userId, isAdmin]);
+  }, [cooperativeId, userId, isAdmin, isIndependentFarmer]);
 
   // ── Data normalization for member view ───────────────────────────────────────
 
-  /** For admin: plots from the list endpoint. For member: mapped from user-plot assignments. */
-  const displayPlots: PlotResponse[] = isAdmin
+  const displayPlots: PlotResponse[] = isAdmin || isIndependentFarmer
     ? plotList
     : (ListUserPlots.data ?? []).map((up) => ({
         id: up.plot.id,
@@ -78,16 +83,18 @@ const ParcelasPage = () => {
       }));
 
   const filtered = sectorFilter
-    ? displayPlots.filter((p) => p.sector.id === sectorFilter)
+    ? displayPlots.filter((p) => p.sector?.id === sectorFilter)
     : displayPlots;
 
-  // ── Derive sectors list: admin uses loaded sectors, member derives from assignments ──
+  // ── Sector filter chips: only admins in cooperatives ─────────────────────────
 
   const visibleSectors = isAdmin
     ? sectors
     : (ListUserPlots.data ?? [])
         .map((up) => up.plot.sector)
         .filter((s, idx, arr) => arr.findIndex((x) => x.id === s.id) === idx);
+
+  const showSectorFilter = !isIndependentFarmer && visibleSectors.length > 0;
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -131,8 +138,14 @@ const ParcelasPage = () => {
     { icon: Trash2, label: 'Eliminar', onClick: () => handleDelete(p), variant: 'destructive' as const },
   ];
 
-  const isLoading = isAdmin ? ListPlots.loading : ListUserPlots.loading;
+  const isLoading = isAdmin || isIndependentFarmer ? ListPlots.loading : ListUserPlots.loading;
   const totalCount = filtered.length;
+
+  const emptyStateMessage = isAdmin
+    ? { main: 'Ninguna parcela registrada', sub: 'Crea la primera usando el botón superior' }
+    : isIndependentFarmer
+      ? { main: 'Aún no tienes parcelas', sub: 'Crea tu primera parcela usando el botón superior' }
+      : { main: 'No tienes parcelas asignadas', sub: 'Contacta al administrador para que te asigne parcelas' };
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -144,21 +157,21 @@ const ParcelasPage = () => {
             <h1 className="text-xl font-bold text-gray-900">Parcelas</h1>
             <p className="mt-0.5 text-sm text-gray-500">
               {totalCount} parcela{totalCount !== 1 ? 's' : ''}
-              {sectorFilter ? ' en este sector' : isAdmin ? ' registradas' : ' asignadas'}
+              {sectorFilter ? ' en este sector' : isAdmin ? ' registradas' : isIndependentFarmer ? ' registradas' : ' asignadas'}
             </p>
           </div>
-          {isAdmin && (
+          {canCreatePlot && (
             <button
               onClick={openCreate}
               className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#27ae60] px-4 py-2 text-sm font-medium text-white shadow-sm transition-[transform,background-color] duration-160 ease-out hover:bg-[#219a52] active:scale-[0.97]"
             >
               <Plus className="h-4 w-4" />
-              Nueva parcela
+              Crear parcela
             </button>
           )}
         </div>
 
-        {visibleSectors.length > 0 && (
+        {showSectorFilter && (
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setSectorFilter('')}
@@ -186,12 +199,8 @@ const ParcelasPage = () => {
 
         {!isLoading && filtered.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 py-16">
-            <p className="text-sm font-medium text-gray-500">
-              {isAdmin ? 'Ninguna parcela registrada' : 'No tienes parcelas asignadas'}
-            </p>
-            <p className="mt-1 text-xs text-gray-400">
-              {isAdmin ? 'Crea la primera usando el botón superior' : 'Contacta al administrador para que te asigne parcelas'}
-            </p>
+            <p className="text-sm font-medium text-gray-500">{emptyStateMessage.main}</p>
+            <p className="mt-1 text-xs text-gray-400">{emptyStateMessage.sub}</p>
           </div>
         )}
 
@@ -201,13 +210,15 @@ const ParcelasPage = () => {
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50">
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Parcela</th>
-                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Sector</th>
+                  {isAdmin && (
+                    <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Sector</th>
+                  )}
                   {isAdmin && (
                     <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Propietario</th>
                   )}
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Área</th>
                   <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Lotes</th>
-                  {isAdmin && <th className="px-3 py-3" />}
+                  {canCreatePlot && <th className="px-3 py-3" />}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -218,13 +229,15 @@ const ParcelasPage = () => {
                     className="cursor-pointer transition-colors hover:bg-gray-50"
                   >
                     <td className="px-5 py-3 font-medium text-gray-900">{p.name}</td>
-                    <td className="px-5 py-3 text-gray-600">{p.sector.name}</td>
+                    {isAdmin && (
+                      <td className="px-5 py-3 text-gray-600">{p.sector?.name}</td>
+                    )}
                     {isAdmin && (
                       <td className="px-5 py-3 text-gray-600">{p.ownerUser?.fullName}</td>
                     )}
                     <td className="px-5 py-3 text-gray-500">{p.areaHectares} ha</td>
                     <td className="px-5 py-3 text-gray-400">{p.subPlotsQuantity || '—'}</td>
-                    {isAdmin && (
+                    {canCreatePlot && (
                       <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                         <RowActions actions={rowActions(p)} />
                       </td>
@@ -249,18 +262,20 @@ const ParcelasPage = () => {
                   className="min-w-0 flex-1 text-left"
                 >
                   <p className="truncate font-semibold text-gray-900">{p.name}</p>
-                  <p className="mt-0.5 text-xs text-gray-500">{p.sector.name} · {p.areaHectares} ha</p>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {isAdmin && p.sector?.name ? `${p.sector.name} · ` : ''}{p.areaHectares} ha
+                  </p>
                   {isAdmin && (
                     <p className="mt-0.5 truncate text-xs text-gray-400">{p.ownerUser?.fullName}</p>
                   )}
                 </button>
-                {isAdmin && <RowActions actions={rowActions(p)} />}
+                {canCreatePlot && <RowActions actions={rowActions(p)} />}
               </div>
             ))}
           </div>
         )}
 
-        {isAdmin && (
+        {canCreatePlot && (
           <PlotFormModal
             open={showForm.active}
             onClose={showForm.off}
@@ -269,6 +284,8 @@ const ParcelasPage = () => {
             sectors={sectors}
             users={users}
             defaultSectorId={sectorFilter}
+            isIndependentFarmer={isIndependentFarmer}
+            currentUserId={userId}
           />
         )}
       </div>
@@ -276,13 +293,13 @@ const ParcelasPage = () => {
       {detail && (
         <PlotDetailPanel
           plot={detail}
-          canEdit={isAdmin}
+          canEdit={canCreatePlot}
           onClose={handleCloseDetail}
           onEdit={() => {
-            if (isAdmin) openEdit(detail);
+            if (canCreatePlot) openEdit(detail);
           }}
           onDelete={() => {
-            if (isAdmin) handleDelete(detail);
+            if (canCreatePlot) handleDelete(detail);
           }}
         />
       )}

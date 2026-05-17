@@ -101,6 +101,7 @@ export const BundlingFormModal = ({
     fields: subPlotFields,
     replace: replaceSubPlotFields,
   } = useFieldArray({ control, name: 'subPlotEntries' });
+console.log('errors',errors);
 
   const subPlotEntries = useWatch({ control, name: 'subPlotEntries' });
 

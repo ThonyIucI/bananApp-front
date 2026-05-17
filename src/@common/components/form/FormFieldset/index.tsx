@@ -1,8 +1,8 @@
-import { GenericHTMLFormElement } from "axios";
+// import { GenericHTMLFormElement } from "axios";
 import { Loader2 } from "lucide-react";
-import { FC } from "react";
+import { DetailedHTMLProps, FC, FormHTMLAttributes } from "react";
 
-interface FormFieldsetProps extends React.HTMLAttributes<GenericHTMLFormElement> {
+interface FormFieldsetProps extends DetailedHTMLProps<FormHTMLAttributes<HTMLFormElement>, HTMLFormElement> {
     isLoading?: boolean;
     disabled?: boolean;
     children: React.ReactNode;

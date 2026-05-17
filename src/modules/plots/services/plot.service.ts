@@ -54,7 +54,7 @@ export interface SubPlotPayload {
 
 export interface CreatePlotPayload {
   name: string;
-  sectorId: string;
+  sectorId?: string;
   ownerUserId: string;
   workerUserId?: string;
   areaHectares: number;

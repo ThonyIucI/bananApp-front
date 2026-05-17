@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   {
     href: '/dashboard',
     label: 'Inicio',
-    roles: ['superadmin', 'admin', 'member', 'bagger', 'harvest_chief', 'calibrator'],
+    roles: ['superadmin', 'admin', 'member', 'bagger', 'harvest_chief', 'calibrator', 'independent_farmer'],
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
@@ -52,7 +52,7 @@ const NAV_ITEMS = [
   {
     href: SECTOR_ROUTES.LIST,
     label: 'Sectores',
-    roles: ['superadmin', 'admin'],
+    roles: ['superadmin', 'admin',],
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" />
@@ -62,7 +62,7 @@ const NAV_ITEMS = [
   {
     href: PLOT_ROUTES.LIST,
     label: 'Parcelas',
-    roles: ['superadmin', 'admin', 'member'],
+    roles: ['superadmin', 'admin', 'member', 'independent_farmer'],
     icon: (
       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498 4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 0 0-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0Z" />
@@ -88,7 +88,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
   const userRoles = user?.cooperatives?.flatMap((c) => c.roles) ?? [];
   const visibleItems = NAV_ITEMS.filter((item) =>
-    item.roles.some((r) => userRoles.includes(r) || user?.isSuperadmin),
+    item.roles.some((r) => user?.isSuperadmin || user?.userRoles?.includes(r) || userRoles.includes(r) ),
   );
 
   const handleLogout = () => {

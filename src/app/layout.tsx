@@ -17,7 +17,7 @@ const APP_NAME = 'CultivApp';
 export const metadata: Metadata = {
   applicationName: APP_NAME,
   title: APP_NAME,
-  description: 'Gestión de cultivos para cooperativas agrícolas',
+  description: 'Gestión de cultivos para agricultores o cooperativas',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
