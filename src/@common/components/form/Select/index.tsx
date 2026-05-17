@@ -40,7 +40,7 @@ export const Select = React.forwardRef<any, CustomSelectProps>(({
                         isDisabled ? '!opacity-60 !cursor-not-allowed' : '!cursor-pointer',
                         isFocused ? '!border-[#27ae60] !ring-2 !ring-[#27ae60]/20' : 
                         '!border-gray-300 hover:!border-gray-400 focus:!border-[#27ae60] focus:!ring-2 focus:!ring-[#27ae60]/20 ',
-                        error ? '!border-red-400' : '',
+                        error ? '!border-red-500' : '',
                         size === 'sm' ? '!px-2 !min-h-[28px]' : '',
                         
                     ),
@@ -69,7 +69,7 @@ export const Select = React.forwardRef<any, CustomSelectProps>(({
                 {...props}
             />
             {error && (
-                <span className="text-xs text-red-500">{error}</span>
+                <span className="text-xs text-red-600">{error}</span>
             )}
         </div>
     )

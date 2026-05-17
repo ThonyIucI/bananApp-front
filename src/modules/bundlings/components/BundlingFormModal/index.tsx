@@ -47,7 +47,14 @@ interface BundlingFormModalProps {
 
 const buildDefaultEnfundadorId = (isAdmin: boolean, userId?: string) =>
   isAdmin ? '' : (userId ?? '');
-
+const defaultValues = {
+  bundledAt: todayIso(),
+  plotId: '',
+  subPlotId: undefined,
+  ribbonColorFree: undefined,
+  notes: '',
+  subPlotEntries: [],
+};
 /** Modal for registering (single or multi-subplot) or editing a bundling operation. */
 export const BundlingFormModal = ({
   open,
@@ -85,12 +92,8 @@ export const BundlingFormModal = ({
   } = useForm<CreateBundlingFormValues>({
     resolver: zodResolver(createBundlingSchema),
     defaultValues: {
-      bundledAt: todayIso(),
-      plotId: '',
-      subPlotId: undefined,
+      ...defaultValues,
       enfundadorUserId: buildDefaultEnfundadorId(isAdmin, userId),
-      notes: '',
-      subPlotEntries: [],
     },
   });
 
@@ -126,12 +129,8 @@ console.log('errors',errors);
       });
     } else {
       reset({
-        bundledAt: todayIso(),
-        plotId: '',
-        subPlotId: undefined,
+        ...defaultValues,
         enfundadorUserId: buildDefaultEnfundadorId(isAdmin, userId),
-        notes: '',
-        subPlotEntries: [],
       });
     }
   }, [open, bundling, userId, isAdmin, reset]);
@@ -240,7 +239,7 @@ console.log('errors',errors);
 
   // ── Submit button label ───────────────────────────────────────────────────────
 
-  const submitLabel = (() => {
+  const getSunmitLabel= () => {
     if (isEditing) return 'Guardar cambios';
     if (isMultiMode) {
       return includedCount > 0
@@ -248,7 +247,7 @@ console.log('errors',errors);
         : 'Selecciona subparcelas';
     }
     return 'Registrar';
-  })();
+  };
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -277,7 +276,7 @@ console.log('errors',errors);
               isLoading={isSaving}
               className="flex-1 sm:flex-none h-11 sm:h-9 sm:px-4"
             >
-              {submitLabel}
+              {getSunmitLabel()}
             </Button>
           </div>
         }
