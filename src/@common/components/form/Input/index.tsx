@@ -12,7 +12,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 /** Styled text input with label and inline error message. */
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, error, isOptional, className = '', ...props }, ref) => (
-    <div className="w-full">
+    <div className="w-full" suppressHydrationWarning>
       {label && (
         <label className="mb-1 flex justify-between text-sm font-medium text-gray-700">
           {label} {isOptional && <Badge variant="secondary" className='text-xs'>Opcional</Badge>}

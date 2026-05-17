@@ -32,3 +32,7 @@ export const PLOT_ROUTES = {
 export const BUNDLING_ROUTES = {
   LIST: '/enfundado',
 } as const;
+
+export const GAIA_ROUTES = {
+  CHAT: '/gaia',
+} as const;
