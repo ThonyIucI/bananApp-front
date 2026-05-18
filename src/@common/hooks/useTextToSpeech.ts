@@ -1,21 +1,30 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
-import { isTtsSupported, getBestVoice, speakText, stopSpeaking } from '@/@common/utils/tts';
-import {
-  isPiperCached,
-  downloadPiper,
-  speakWithPiper,
-} from '@/lib/piper';
+import { isTtsSupported } from '@/@common/utils/tts';
+import { downloadPiper } from '@/lib/piper';
+import { nativeEngine } from '@/@common/tts/engines/nativeEngine';
+import { piperEngine } from '@/@common/tts/engines/piperEngine';
+import { geminiEngine } from '@/@common/tts/engines/geminiEngine';
+import { splitIntoSegments } from '@/@common/tts/segments';
+import { runTtsQueue } from '@/@common/tts/player';
+import { getTtsSettings } from '@/@common/tts/settings';
+import { ETtsEngine } from '@/@common/tts/constants';
+import type { ITtsEngine } from '@/@common/tts/engines/types';
 
 export type TPiperStatus = 'idle' | 'downloading' | 'ready' | 'error';
 
 export interface ITtsControl {
+  /** Start reading a message from the beginning. Toggles off if the same message is playing. */
   read: (text: string, id: string) => void;
+  /** Start reading a message from a specific segment index. */
+  readFromSegment: (text: string, id: string, segmentIndex: number) => void;
   stop: () => void;
   isReading: boolean;
   isReadingId: (id: string) => boolean;
+  /** Index of the segment currently being spoken, or null when not reading. */
+  activeSegmentIndex: number | null;
   isSupported: boolean;
   showSetup: boolean;
   dismissSetup: () => void;
@@ -24,149 +33,153 @@ export interface ITtsControl {
   triggerPiperDownload: () => void;
 }
 
-// Native TTS errors that mean the device has no working speech engine
-const CONFIG_ERRORS = new Set(['synthesis-failed', 'voice-unavailable', 'language-unavailable']);
-
 /**
- * Manages text-to-speech with two-tier fallback:
- * 1. Native Web Speech API (instant, no download)
- * 2. Piper WASM (offline, downloaded once to OPFS ~63 MB)
+ * Orchestrates text-to-speech with two-tier engine chain:
+ * 1. Native Web Speech API (instant, depends on device voices)
+ * 2. Piper WASM (offline female voice, downloaded once to OPFS ~63 MB)
  *
- * When native TTS fails and Piper is not cached, `showSetup` becomes true
- * so the UI can offer the user a download option.
+ * Text is split into short segments before synthesis — first audio plays in ~1-2 s
+ * while the rest is synthesized in parallel. Synthesized blobs are cached in memory
+ * so re-reading the same message is instantaneous for Piper.
  */
 export const useTextToSpeech = (): ITtsControl => {
   const [isReading, setIsReading] = useState(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
+  const [activeSegmentIndex, setActiveSegmentIndex] = useState<number | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [piperStatus, setPiperStatus] = useState<TPiperStatus>('idle');
   const [piperProgress, setPiperProgress] = useState(0);
 
-  const supported = isTtsSupported();
-  const piperPlaybackRef = useRef<{ stop: () => void } | null>(null);
-  // Text to auto-speak once Piper finishes downloading
-  const pendingRef = useRef<{ text: string; id: string } | null>(null);
-  // Abort flag: set to true when stop() is called during async Piper synthesis
-  const abortedRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  // Per-session blob cache: keyed by segment spoken text, avoids re-running Piper WASM
+  const blobCacheRef = useRef<Map<string, Blob>>(new Map());
+  const pendingRef = useRef<{ text: string; id: string; fromIndex: number } | null>(null);
 
-  const doSpeakWithPiper = async (text: string, id: string) => {
-    abortedRef.current = false;
+  // Stop and abort any in-progress reading
+  const stopCurrent = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setIsReading(false);
+    setCurrentId(null);
+    setActiveSegmentIndex(null);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
+  /** Resolves the best available engine based on user preference and availability. */
+  const resolveEngine = async (): Promise<ITtsEngine | null> => {
+    const { engine: preferred } = getTtsSettings();
+
+    if (preferred === ETtsEngine.GEMINI) return geminiEngine;
+
+    if (preferred === ETtsEngine.PIPER) {
+      if (await piperEngine.isAvailable()) return piperEngine;
+      return null; // needs download
+    }
+
+    // Default chain: native → Piper
+    if (isTtsSupported()) {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) return nativeEngine;
+
+      // Voices not loaded yet — wait up to 1.5 s
+      const voiceReady = await new Promise<boolean>((resolve) => {
+        let done = false;
+        const onChanged = () => {
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          window.speechSynthesis.removeEventListener('voiceschanged', onChanged);
+          resolve(window.speechSynthesis.getVoices().length > 0);
+        };
+        const timer = setTimeout(() => {
+          if (done) return;
+          done = true;
+          window.speechSynthesis.removeEventListener('voiceschanged', onChanged);
+          resolve(false);
+        }, 1500);
+        window.speechSynthesis.addEventListener('voiceschanged', onChanged);
+      });
+      if (voiceReady) return nativeEngine;
+    }
+
+    if (await piperEngine.isAvailable()) return piperEngine;
+
+    return null;
+  };
+
+  const doRead = async (text: string, id: string, fromIndex: number) => {
+    stopCurrent();
+
+    const controller = new AbortController();
+    abortRef.current = controller;
     setIsReading(true);
     setCurrentId(id);
-    try {
-      const playback = await speakWithPiper(text, {
-        onEnd: () => {
-          setIsReading(false);
-          setCurrentId(null);
-          piperPlaybackRef.current = null;
-        },
-        onError: () => {
-          setIsReading(false);
-          setCurrentId(null);
-          piperPlaybackRef.current = null;
-          toast.error('No se pudo reproducir con la voz integrada');
-        },
-      });
-      if (abortedRef.current) {
-        playback.stop();
-        return;
-      }
-      piperPlaybackRef.current = playback;
-    } catch {
-      if (!abortedRef.current) {
+    setActiveSegmentIndex(fromIndex);
+
+    const engine = await resolveEngine();
+
+    if (!engine) {
+      pendingRef.current = { text, id, fromIndex };
+      setShowSetup(true);
+      setIsReading(false);
+      setCurrentId(null);
+      setActiveSegmentIndex(null);
+      return;
+    }
+
+    if (controller.signal.aborted) return;
+
+    const segments = splitIntoSegments(text);
+    if (segments.length === 0) {
+      setIsReading(false);
+      setCurrentId(null);
+      setActiveSegmentIndex(null);
+      return;
+    }
+
+    await runTtsQueue({
+      segments,
+      fromIndex: Math.min(fromIndex, segments.length - 1),
+      engine,
+      onSegmentStart: (i) => setActiveSegmentIndex(i),
+      onDone: () => {
         setIsReading(false);
         setCurrentId(null);
-        toast.error('Error al sintetizar con la voz integrada');
-      }
-    }
-  };
-
-  const tryPiper = async (text: string, id: string) => {
-    const cached = await isPiperCached();
-    if (cached) {
-      setPiperStatus('ready');
-      await doSpeakWithPiper(text, id);
-    } else {
-      pendingRef.current = { text, id };
-      setShowSetup(true);
-    }
-  };
-
-  const doNativeSpeak = (text: string, id: string) => {
-    const voice = getBestVoice('es') ?? getBestVoice('') ?? null;
-    setTimeout(() => {
-      speakText(text, voice, {
-        onEnd: () => {
+        setActiveSegmentIndex(null);
+      },
+      onError: () => {
+        if (!controller.signal.aborted) {
+          toast.error('Error al reproducir el audio', { toastId: 'tts-error' });
           setIsReading(false);
           setCurrentId(null);
-        },
-        onError: (event) => {
-          if (CONFIG_ERRORS.has(event.error)) {
-            // Native engine broken → try Piper
-            void tryPiper(text, id);
-          } else {
-            setIsReading(false);
-            setCurrentId(null);
-            toast.error(`No se pudo reproducir el audio [${event.error}]`);
-          }
-        },
-      });
-    }, 50);
+          setActiveSegmentIndex(null);
+        }
+      },
+      signal: controller.signal,
+      blobCache: blobCacheRef.current,
+    });
   };
 
   const read = (text: string, id: string) => {
-    if (!supported) {
-      void tryPiper(text, id);
-      return;
-    }
-
-    // Toggle off if same message is playing
     if (currentId === id && isReading) {
-      stop();
+      stopCurrent();
       return;
     }
+    void doRead(text, id, 0);
+  };
 
-    stopSpeaking();
-    piperPlaybackRef.current?.stop();
-    piperPlaybackRef.current = null;
-    setIsReading(true);
-    setCurrentId(id);
-
-    const voices = window.speechSynthesis.getVoices();
-
-    if (voices.length > 0) {
-      doNativeSpeak(text, id);
-      return;
-    }
-
-    // Voices not loaded yet — wait up to 2s then fall back to Piper
-    let resolved = false;
-
-    const onVoicesChanged = () => {
-      if (resolved) return;
-      resolved = true;
-      clearTimeout(timeout);
-      window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
-      doNativeSpeak(text, id);
-    };
-
-    const timeout = setTimeout(() => {
-      if (resolved) return;
-      resolved = true;
-      window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
-      void tryPiper(text, id);
-    }, 2000);
-
-    window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+  const readFromSegment = (text: string, id: string, segmentIndex: number) => {
+    void doRead(text, id, segmentIndex);
   };
 
   const stop = () => {
-    abortedRef.current = true;
-    stopSpeaking();
-    piperPlaybackRef.current?.stop();
-    piperPlaybackRef.current = null;
-    setIsReading(false);
-    setCurrentId(null);
+    stopCurrent();
   };
 
   const triggerPiperDownload = () => {
@@ -179,36 +192,35 @@ export const useTextToSpeech = (): ITtsControl => {
         setPiperStatus('ready');
         setPiperProgress(100);
         setShowSetup(false);
-        // Auto-speak the message that triggered the setup sheet
         if (pendingRef.current) {
-          const { text, id } = pendingRef.current;
+          const { text, id, fromIndex } = pendingRef.current;
           pendingRef.current = null;
-          await doSpeakWithPiper(text, id);
+          await doRead(text, id, fromIndex);
         }
       })
       .catch(() => {
         setPiperStatus('error');
-        toast.error('Error al descargar la voz. Revisa tu conexión e intenta de nuevo.');
+        toast.error('Error al descargar la voz. Revisa tu conexión e intenta de nuevo.', {
+          toastId: 'piper-download-error',
+        });
       });
   };
 
   const dismissSetup = () => {
     setShowSetup(false);
     pendingRef.current = null;
-    if (!isReading) {
-      setIsReading(false);
-      setCurrentId(null);
-    }
   };
 
   const isReadingId = (id: string) => currentId === id && isReading;
 
   return {
     read,
+    readFromSegment,
     stop,
     isReading,
     isReadingId,
-    isSupported: supported,
+    activeSegmentIndex,
+    isSupported: typeof window !== 'undefined',
     showSetup,
     dismissSetup,
     piperStatus,
