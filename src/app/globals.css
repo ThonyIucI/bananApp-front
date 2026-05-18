@@ -91,11 +91,27 @@
   animation: fade-in 200ms ease both;
 }
 
+/* Bottom-sheet: slides from bottom on mobile, scales from center on desktop */
+@keyframes sheet-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (max-width: 639px) {
+  @keyframes sheet-in {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+  }
+}
+.animate-sheet-in {
+  animation: sheet-in 300ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-modal-in,
   .animate-panel-in,
   .animate-message-in,
-  .animate-fade-in {
+  .animate-fade-in,
+  .animate-sheet-in {
     animation: none;
   }
 }
