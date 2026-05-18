@@ -5,6 +5,7 @@ import { Bot, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGaiaConversation } from '../../hooks/useGaiaConversation';
 import { useTextToSpeech } from '@/@common/hooks/useTextToSpeech';
+import { TtsSetupSheet } from '@/@common/components/TtsSetupSheet';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { QuotaBadge } from './QuotaBadge';
@@ -97,6 +98,15 @@ export const GaiaChat = ({ plan = 'free' }: GaiaChatProps) => {
 
       {/* Input */}
       <ChatInput onSubmit={Conversation.send} disabled={Conversation.loading} />
+
+      {Tts.showSetup && (
+        <TtsSetupSheet
+          piperStatus={Tts.piperStatus}
+          piperProgress={Tts.piperProgress}
+          onDownload={Tts.triggerPiperDownload}
+          onDismiss={Tts.dismissSetup}
+        />
+      )}
     </div>
   );
 };
