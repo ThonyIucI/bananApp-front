@@ -1,17 +1,24 @@
 'use client';
 
-import { Volume2, RotateCcw, AlertCircle } from 'lucide-react';
+import { Volume2, VolumeX, RotateCcw, AlertCircle } from 'lucide-react';
 import type { ILocalGaiaMessage } from '../../../hooks/useGaiaConversation';
+import type { ITtsControl } from '@/@common/hooks/useTextToSpeech';
 
 interface MessageBubbleProps {
   message: ILocalGaiaMessage;
   onRetry?: (id: string) => void;
+  tts?: ITtsControl;
 }
 
 /** Renders a single chat bubble. User messages align right, GaIA messages align left. */
-export const MessageBubble = ({ message, onRetry }: MessageBubbleProps) => {
+export const MessageBubble = ({ message, onRetry, tts }: MessageBubbleProps) => {
   const isUser = message.role === 'user';
   const hasError = !!message.error;
+  const isAssistant = message.role === 'assistant';
+  const reading = tts?.isReadingId(message.id) ?? false;
+
+  const showAudioActive = isAssistant && !hasError && tts?.isSupported;
+  const showAudioDisabled = isAssistant && !hasError && tts && !tts.isSupported;
 
   return (
     <div className={`flex items-end gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -35,21 +42,43 @@ export const MessageBubble = ({ message, onRetry }: MessageBubbleProps) => {
         >
           <p className="whitespace-pre-wrap wrap-break-word">{message.text}</p>
 
-          {/* Placeholder audio button — activates in QW1.2 */}
-          {!hasError && (
+          {/* Active audio button — TTS supported and Spanish voice available */}
+          {showAudioActive && (
+            <button
+              type="button"
+              onClick={() => tts!.read(message.text, message.id)}
+              aria-label={reading ? 'Detener lectura' : 'Escuchar mensaje'}
+              title={reading ? 'Detener lectura' : 'Escuchar mensaje'}
+              className={[
+                'absolute -bottom-2 -right-7',
+                'flex h-11 w-11 items-center justify-center rounded-full shadow-sm',
+                'bg-white ring-1 transition-all duration-150',
+                'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+                reading
+                  ? 'scale-110 animate-pulse ring-[#3BB25E] text-[#3BB25E]'
+                  : 'ring-gray-200 text-gray-400 hover:text-[#3BB25E] hover:ring-[#3BB25E] active:scale-95',
+              ].join(' ')}
+            >
+              {reading ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+          )}
+
+          {/* Disabled audio button — TTS not supported or no Spanish voice */}
+          {showAudioDisabled && (
             <button
               type="button"
               disabled
-              aria-label="Escuchar mensaje"
+              aria-label="Lectura en voz alta no disponible en este dispositivo"
+              title="Lectura en voz alta no disponible en este dispositivo"
               className={[
-                'absolute -bottom-2 opacity-0 transition-opacity group-hover:opacity-100',
-                isUser ? '-left-7' : '-right-7',
-                'flex h-6 w-6 items-center justify-center rounded-full shadow',
-                'bg-white text-gray-400 ring-1 ring-gray-200',
+                'absolute -bottom-2 -right-7',
+                'flex h-11 w-11 items-center justify-center rounded-full shadow-sm',
+                'bg-white ring-1 ring-gray-100 text-gray-300',
+                'opacity-0 group-hover:opacity-100',
                 'cursor-not-allowed',
               ].join(' ')}
             >
-              <Volume2 className="h-3 w-3" />
+              <Volume2 className="h-4 w-4" />
             </button>
           )}
         </div>

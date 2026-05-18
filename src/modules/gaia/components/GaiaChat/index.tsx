@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { Bot, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGaiaConversation } from '../../hooks/useGaiaConversation';
+import { useTextToSpeech } from '@/@common/hooks/useTextToSpeech';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { QuotaBadge } from './QuotaBadge';
@@ -17,6 +18,7 @@ interface GaiaChatProps {
 /** Full GaIA chat panel: message history, quota badge, input, and auto-scroll. */
 export const GaiaChat = ({ plan = 'free' }: GaiaChatProps) => {
   const Conversation = useGaiaConversation(plan);
+  const Tts = useTextToSpeech();
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -72,7 +74,7 @@ export const GaiaChat = ({ plan = 'free' }: GaiaChatProps) => {
         )}
 
         {Conversation.messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} onRetry={Conversation.retry} />
+          <MessageBubble key={msg.id} message={msg} onRetry={Conversation.retry} tts={Tts} />
         ))}
 
         {Conversation.loading && (
