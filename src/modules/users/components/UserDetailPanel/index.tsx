@@ -4,18 +4,33 @@ import { useEffect } from 'react';
 import { MapPin } from 'lucide-react';
 import { DetailPanel } from '@/@common/components/DetailPanel';
 import { formatDate } from '@/@common/utils/date';
-import { ROLE_LABELS, type UserResponse, type TRoleKey } from '@/modules/users/services/user.service';
+import {
+  ROLE_LABELS,
+  GAIA_PLAN_LABELS,
+  EGaiaPlan,
+  type UserResponse,
+  type TRoleKey,
+  type TGaiaPlan,
+} from '@/modules/users/services/user.service';
 import { useListUserPlots } from '@/modules/users/hooks/useListUserPlots';
+import { useUpdateUserPlan } from '@/modules/users/hooks/useUpdateUserPlan';
+import { useAuthContext } from '@/modules/auth/context/auth.context';
 
 interface UserDetailPanelProps {
   user: UserResponse;
   onClose: () => void;
+  /** Called with the updated user after a plan change. */
+  onUpdated?: (user: UserResponse) => void;
 }
 
-/** Slide-in panel showing full user info, cooperative memberships, and plot assignments. */
-export const UserDetailPanel = ({ user, onClose }: UserDetailPanelProps) => {
+const PLAN_OPTIONS = Object.values(EGaiaPlan) as TGaiaPlan[];
+
+/** Slide-in panel showing full user info, cooperative memberships, plot assignments, and GaIA plan. */
+export const UserDetailPanel = ({ user, onClose, onUpdated }: UserDetailPanelProps) => {
+  const { isSuperadmin } = useAuthContext();
   const cooperativeId = user.cooperatives?.[0]?.cooperativeId ?? '';
   const ListUserPlots = useListUserPlots();
+  const UpdatePlan = useUpdateUserPlan();
   const plots = ListUserPlots.data ?? [];
 
   useEffect(() => {
@@ -23,6 +38,12 @@ export const UserDetailPanel = ({ user, onClose }: UserDetailPanelProps) => {
     ListUserPlots.handler({ userId: user.id, cooperativeId });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user.id, cooperativeId]);
+
+  const handlePlanChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const plan = e.target.value as EGaiaPlan;
+    const result = await UpdatePlan.handler(user.id, plan);
+    if (result) onUpdated?.(result);
+  };
 
   return (
     <DetailPanel title={user.fullName} subtitle={user.email} onClose={onClose}>
@@ -39,6 +60,38 @@ export const UserDetailPanel = ({ user, onClose }: UserDetailPanelProps) => {
               <span className="text-sm font-medium text-gray-900">{value}</span>
             </div>
           ))}
+        </div>
+
+        {/* ── GaIA plan ── */}
+        <div>
+          <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Plan GaIA</h3>
+          {isSuperadmin ? (
+            <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+              <span className="text-xs text-gray-500">Plan actual</span>
+              <select
+                value={user.subscriptionTier ?? EGaiaPlan.FREE}
+                onChange={handlePlanChange}
+                disabled={UpdatePlan.loading}
+                className="ml-auto rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#27ae60]/40 disabled:opacity-50"
+              >
+                {PLAN_OPTIONS.map((plan) => (
+                  <option key={plan} value={plan}>
+                    {GAIA_PLAN_LABELS[plan]}
+                  </option>
+                ))}
+              </select>
+              {UpdatePlan.loading && (
+                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#27ae60] border-t-transparent" />
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
+              <span className="text-xs text-gray-500">Plan actual</span>
+              <span className="text-sm font-medium text-gray-900">
+                {GAIA_PLAN_LABELS[user.subscriptionTier as TGaiaPlan] ?? user.subscriptionTier}
+              </span>
+            </div>
+          )}
         </div>
 
         <div>

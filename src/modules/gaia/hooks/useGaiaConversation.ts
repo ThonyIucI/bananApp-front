@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { isAxiosError } from 'axios';
 import useRequest from '@/@common/hooks/useRequest';
 import { sendGaiaMessageRequest } from '../services/gaia.service';
+import { useSubmitGaiaFeedback } from './useSubmitGaiaFeedback';
 import { GAIA_PLAN_LIMITS, type TGaiaPlan } from '../constants';
 import type { IGaiaHistoryMessage } from '../services/gaia.service';
 
@@ -13,11 +14,17 @@ const STORAGE_KEY = 'gaia_chat_v1';
 const QUOTA_EXCEEDED_MESSAGE =
   'Has alcanzado tu límite diario de interacciones con GaIA. Actualiza tu plan para continuar.';
 
-/** Local message with optional error state for retry UI. */
+export type TGaiaQueryFeedback = 'HELPFUL' | 'NOT_HELPFUL';
+
+/** Local message with optional error, queryId and feedback state. */
 export interface ILocalGaiaMessage {
   id: string;
   role: IGaiaHistoryMessage['role'];
   text: string;
+  /** ID of the analytics record in the backend — null if persistence failed (non-critical). */
+  queryId?: string | null;
+  /** Explicit user feedback once submitted. */
+  feedback?: TGaiaQueryFeedback;
   /** True when the send failed and the message can be retried. */
   error?: boolean;
 }
@@ -48,7 +55,7 @@ const toApiHistory = (messages: ILocalGaiaMessage[]): IGaiaHistoryMessage[] =>
 
 /**
  * Manages a GaIA conversation with local persistence, context trimming,
- * error state per message, and retry support.
+ * error state per message, retry support, and explicit feedback (👍/👎).
  */
 export const useGaiaConversation = (plan: TGaiaPlan = 'free') => {
   const [messages, setMessages] = useState<ILocalGaiaMessage[]>(readStorage);
@@ -56,6 +63,7 @@ export const useGaiaConversation = (plan: TGaiaPlan = 'free') => {
   const sendingIdRef = useRef<string | null>(null);
 
   const { loading, handleRequest } = useRequest(false);
+  const SubmitFeedback = useSubmitGaiaFeedback();
 
   useEffect(() => {
     writeStorage(messages);
@@ -93,6 +101,7 @@ export const useGaiaConversation = (plan: TGaiaPlan = 'free') => {
             id: crypto.randomUUID(),
             role: 'assistant',
             text: data?.reply.text ?? '',
+            queryId: data?.queryId ?? null,
           };
 
           setMessages((prev) => [...prev, assistantMessage]);
@@ -104,7 +113,6 @@ export const useGaiaConversation = (plan: TGaiaPlan = 'free') => {
           return data;
         },
         (errMessage, err) => {
-          // Mark the user message as errored instead of removing it
           updateMessage(id, { error: true });
 
           const status = isAxiosError(err) ? err.response?.status : null;
@@ -142,11 +150,29 @@ export const useGaiaConversation = (plan: TGaiaPlan = 'free') => {
     [messages, send],
   );
 
+  /**
+   * Sends 👍/👎 feedback for an assistant message and persists the result locally.
+   * No-op if the message has no queryId or already has feedback.
+   */
+  const submitFeedback = useCallback(
+    async (messageId: string, helpful: boolean) => {
+      const message = messages.find((m) => m.id === messageId);
+      if (!message?.queryId || message.feedback) return;
+      const ok = await SubmitFeedback.handler(message.queryId, helpful);
+      if (ok) {
+        updateMessage(messageId, {
+          feedback: helpful ? 'HELPFUL' : 'NOT_HELPFUL',
+        });
+      }
+    },
+    [messages, SubmitFeedback, updateMessage],
+  );
+
   const clearChat = useCallback(() => {
     setMessages([]);
     setRemaining(null);
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
-  return { messages, remaining, send, retry, clearChat, loading };
+  return { messages, remaining, send, retry, submitFeedback, clearChat, loading };
 };

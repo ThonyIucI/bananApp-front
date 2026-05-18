@@ -36,3 +36,7 @@ export const BUNDLING_ROUTES = {
 export const GAIA_ROUTES = {
   CHAT: '/gaia',
 } as const;
+
+export const SETTINGS_ROUTES = {
+  ROOT: '/configuracion',
+} as const;

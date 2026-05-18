@@ -230,7 +230,16 @@ const UsersPage = () => {
           cooperatives={cooperatives}
         />
 
-        {detailUser && <UserDetailPanel user={detailUser} onClose={() => setDetailUser(null)} />}
+        {detailUser && (
+          <UserDetailPanel
+            user={detailUser}
+            onClose={() => setDetailUser(null)}
+            onUpdated={(updated) => {
+              ListUsers.onUpsert(updated);
+              setDetailUser(updated);
+            }}
+          />
+        )}
 
         {assignTarget && (
           <AssignCooperativeModal

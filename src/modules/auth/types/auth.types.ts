@@ -29,6 +29,7 @@ export interface AuthUser {
   createdAt: string;
   cooperatives: CooperativeMembership[];
   userRoles: string[];
+  subscriptionTier: string;
 }
 
 export interface LoginResponse {
