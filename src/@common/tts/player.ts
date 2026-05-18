@@ -1,7 +1,7 @@
 'use client';
 
 import type { TTtsSegment } from './segments';
-import type { ITtsEngine } from './engines/types';
+import type { ITtsClip, ITtsEngine } from './engines/types';
 
 interface TRunTtsQueueOptions {
   segments: TTtsSegment[];
@@ -36,12 +36,12 @@ export const runTtsQueue = async ({
   signal,
   blobCache,
 }: TRunTtsQueueOptions): Promise<void> => {
-  let lookaheadPromise: Promise<import('./engines/types').ITtsClip> | null = null;
+  let lookaheadPromise: Promise<ITtsClip> | null = null;
 
   for (let i = fromIndex; i < segments.length; i++) {
     if (signal.aborted) return;
 
-    let clip: import('./engines/types').ITtsClip;
+    let clip: ITtsClip;
     try {
       if (lookaheadPromise) {
         clip = await lookaheadPromise;

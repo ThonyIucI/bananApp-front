@@ -7,7 +7,10 @@ import type { ITtsClip, ITtsEngine } from './types';
 
 /** Converts a base64-encoded PCM audio string to a WAV Blob. */
 const pcmBase64ToWavBlob = (base64: string, mimeType: string): Blob => {
-  if (!mimeType.startsWith('audio/pcm')) {
+  const lower = mimeType.toLowerCase();
+  const isPcm = lower.startsWith('audio/pcm') || lower.startsWith('audio/l16');
+
+  if (!isPcm) {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
