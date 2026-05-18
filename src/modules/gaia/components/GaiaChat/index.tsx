@@ -99,7 +99,13 @@ export const GaiaChat = ({ plan = 'free' }: GaiaChatProps) => {
         )}
 
         {Conversation.messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} onRetry={Conversation.retry} tts={Tts} />
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            onRetry={Conversation.retry}
+            onFeedback={Conversation.submitFeedback}
+            tts={Tts}
+          />
         ))}
 
         {Conversation.loading && (
