@@ -89,12 +89,14 @@ export const GaiaAudioSettings = () => {
       <div className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Motor de voz</p>
 
-        {/* ── Native ── */}
+        {/* ── Native ── disabled when device has no Spanish voice */}
         <button
           type="button"
-          onClick={() => selectEngine(ETtsEngine.NATIVE)}
+          disabled={!nativeOk}
+          onClick={() => nativeOk && selectEngine(ETtsEngine.NATIVE)}
           aria-pressed={isNativeActive}
-          className={`${CARD_BASE} ${isNativeActive ? CARD_ACTIVE_GREEN : CARD_INACTIVE} flex cursor-pointer items-center gap-3 p-4 active:scale-[0.98]`}
+          className={`${CARD_BASE} ${isNativeActive ? CARD_ACTIVE_GREEN : CARD_INACTIVE} flex items-center gap-3 p-4
+            ${nativeOk ? 'cursor-pointer active:scale-[0.98]' : 'cursor-not-allowed opacity-50 active:scale-100'}`}
         >
           <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors duration-150 ${isNativeActive ? 'bg-[#3BB25E]/15' : 'bg-blue-50'}`}>
             <Monitor className={`h-4 w-4 transition-colors duration-150 ${isNativeActive ? 'text-[#3BB25E]' : 'text-blue-400'}`} />
@@ -102,11 +104,17 @@ export const GaiaAudioSettings = () => {
           <div className="flex-1 text-left">
             <p className="text-sm font-medium text-gray-800">{ttsEngineLabels[ETtsEngine.NATIVE]}</p>
             <p className="text-xs text-gray-500">
-              {nativeOk ? 'Voz en español disponible' : 'Sin voz ES · instala la voz offline'}
+              {nativeOk ? 'Voz en español disponible' : 'Sin voz ES en este dispositivo'}
             </p>
           </div>
-          {/* Radio dot */}
-          <div className={`h-4 w-4 shrink-0 rounded-full border-2 transition-[border-color,background-color] duration-150 ${isNativeActive ? 'border-[#3BB25E] bg-[#3BB25E]' : 'border-gray-300 bg-white'}`} />
+          {/* Radio dot — only meaningful when available */}
+          {nativeOk ? (
+            <div className={`h-4 w-4 shrink-0 rounded-full border-2 transition-[border-color,background-color] duration-150 ${isNativeActive ? 'border-[#3BB25E] bg-[#3BB25E]' : 'border-gray-300 bg-white'}`} />
+          ) : (
+            <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">
+              No disponible
+            </span>
+          )}
         </button>
 
         {/* ── Piper offline ── */}
