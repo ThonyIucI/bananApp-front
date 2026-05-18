@@ -1,6 +1,9 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Volume2, VolumeX, RotateCcw, AlertCircle } from 'lucide-react';
+import { MarkdownText } from '@/@common/components/MarkdownText';
+import { splitIntoSegments } from '@/@common/tts/segments';
 import type { ILocalGaiaMessage } from '../../../hooks/useGaiaConversation';
 import type { ITtsControl } from '@/@common/hooks/useTextToSpeech';
 
@@ -17,8 +20,17 @@ export const MessageBubble = ({ message, onRetry, tts }: MessageBubbleProps) => 
   const isAssistant = message.role === 'assistant';
   const reading = tts?.isReadingId(message.id) ?? false;
 
-  const showAudioActive = isAssistant && !hasError && tts?.isSupported;
-  const showAudioDisabled = isAssistant && !hasError && tts && !tts.isSupported;
+  // Memoize segments so the same split is shared by both MarkdownText and TTS calls
+  const segments = useMemo(
+    () => (isAssistant ? splitIntoSegments(message.text) : []),
+    [isAssistant, message.text],
+  );
+
+  const activeSegmentIndex = reading ? (tts?.activeSegmentIndex ?? null) : null;
+
+  const handlePlaySegment = (index: number) => {
+    tts?.readFromSegment(message.text, message.id, index);
+  };
 
   return (
     <div className={`flex items-end gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -40,13 +52,21 @@ export const MessageBubble = ({ message, onRetry, tts }: MessageBubbleProps) => 
                 : 'rounded-bl-sm bg-white text-gray-800 ring-1 ring-gray-100',
           ].join(' ')}
         >
-          <p className="whitespace-pre-wrap wrap-break-word">{message.text}</p>
+          {isAssistant && !hasError ? (
+            <MarkdownText
+              text={message.text}
+              activeSegmentIndex={activeSegmentIndex}
+              onPlaySegment={segments.length > 1 ? handlePlaySegment : undefined}
+            />
+          ) : (
+            <p className="whitespace-pre-wrap wrap-break-word">{message.text}</p>
+          )}
 
-          {/* Active audio button — TTS supported and Spanish voice available */}
-          {showAudioActive && (
+          {/* Global audio button — reads the whole message from the start */}
+          {isAssistant && !hasError && tts && (
             <button
               type="button"
-              onClick={() => tts!.read(message.text, message.id)}
+              onClick={() => tts.read(message.text, message.id)}
               aria-label={reading ? 'Detener lectura' : 'Escuchar mensaje'}
               title={reading ? 'Detener lectura' : 'Escuchar mensaje'}
               className={[
@@ -60,25 +80,6 @@ export const MessageBubble = ({ message, onRetry, tts }: MessageBubbleProps) => 
               ].join(' ')}
             >
               {reading ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-            </button>
-          )}
-
-          {/* Disabled audio button — TTS not supported or no Spanish voice */}
-          {showAudioDisabled && (
-            <button
-              type="button"
-              disabled
-              aria-label="Lectura en voz alta no disponible en este dispositivo"
-              title="Lectura en voz alta no disponible en este dispositivo"
-              className={[
-                'absolute -bottom-2 -right-7',
-                'flex h-11 w-11 items-center justify-center rounded-full shadow-sm',
-                'bg-white ring-1 ring-gray-100 text-gray-300',
-                'opacity-0 group-hover:opacity-100',
-                'cursor-not-allowed',
-              ].join(' ')}
-            >
-              <Volume2 className="h-4 w-4" />
             </button>
           )}
         </div>

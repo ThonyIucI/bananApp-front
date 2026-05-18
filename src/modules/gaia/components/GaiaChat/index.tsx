@@ -5,6 +5,7 @@ import { Bot, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useGaiaConversation } from '../../hooks/useGaiaConversation';
 import { useTextToSpeech } from '@/@common/hooks/useTextToSpeech';
+import { useTtsSettings } from '@/@common/hooks/useTtsSettings';
 import { TtsSetupSheet } from '@/@common/components/TtsSetupSheet';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
@@ -20,11 +21,34 @@ interface GaiaChatProps {
 export const GaiaChat = ({ plan = 'free' }: GaiaChatProps) => {
   const Conversation = useGaiaConversation(plan);
   const Tts = useTextToSpeech();
+  const TtsSettings = useTtsSettings();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const prevMsgCountRef = useRef(0);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [Conversation.messages]);
+
+  // Auto-read: when a new assistant message arrives and auto-read is enabled
+  useEffect(() => {
+    const msgs = Conversation.messages;
+    if (TtsSettings.autoRead && msgs.length > prevMsgCountRef.current) {
+      const last = msgs[msgs.length - 1];
+      if (last?.role === 'assistant' && !last.error) {
+        Tts.read(last.text, last.id);
+      }
+    }
+    prevMsgCountRef.current = msgs.length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Conversation.messages]);
+
+  // Stop TTS on unmount
+  useEffect(() => {
+    return () => {
+      Tts.stop();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const planLimit = GAIA_PLAN_LIMITS[plan].dailyInteractions;
 
