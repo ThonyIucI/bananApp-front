@@ -18,7 +18,7 @@ export const useSubmitGaiaFeedback = () => {
         // Feedback errors are non-critical — swallow silently, no toast
       },
     );
-    return result ?? false;
+    return !!result;
   };
 
   return { loading, handler };
