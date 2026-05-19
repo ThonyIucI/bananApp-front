@@ -52,6 +52,7 @@ export const PlotFormModal = ({
   const showConfirmClose = useBoolean();
 
   const isSaving = creating || updating;
+console.log(isSaving);
 
   const sectorOptions = useMemo(() =>
     sectors.map((s) => ({ value: s.id, label: s.name })), [sectors]);
